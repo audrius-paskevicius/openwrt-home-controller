@@ -44,7 +44,10 @@ SIGN_KEY="$(pwd)/../home-controller-signing/private.pem" APK_TOOL=/path/to/apk.s
 
 The application builder reads [VERSION](../VERSION), requires the backend and radio
 helper in `dist/`, and creates `dist/luci-app-home-controller-VERSION.apk`. It copies
-the canonical disclaimer into the package and both interfaces. It does not generate
+the canonical disclaimer into the package and both interfaces, and installs the
+LuCI disclaimer and help stylesheets. The Markdown guides are distributed in the
+repository and application source archive; they are not installed by the APK.
+The builder does not generate
 the public key, release notes, source ZIP or checksum manifest. Keep the repository's
 published verification key unchanged when building with your own key.
 
@@ -95,6 +98,13 @@ against the local files. Generate the application source ZIP with `git archive`
 from the exact release commit, using a `home-controller/` prefix. Source archives
 remain snapshots of their release tags; later documentation corrections on `main`
 do not change those tags or binaries.
+
+For a documentation/package-only release, unchanged verified backend, radio helper
+and driver artifacts may be reused. State that explicitly in the release notes;
+do not present older radio or installation tests as newly performed checks. Build a
+new application APK from the release source and version, verify its signature and
+extracted contents, then generate the six-file checksum manifest. Packaging does not
+itself install the APK or restart a running controller.
 
 The installed interfaces and `/usr/share/home-controller/DISCLAIMER.txt` also expose
 the notice. Current package hooks do not print it to the terminal during installation.

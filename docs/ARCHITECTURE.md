@@ -5,6 +5,16 @@ serves Home Controller over HTTPS. It runs as `homecontroller`, with its own doc
 root and no ubus or LuCI endpoint. Its CGI gateway forwards only login, logout, state,
 device-command and scheduler Start/Stop requests to a private Unix socket. The page response prohibits
 framing and uses a restrictive Content Security Policy.
+The CGI gateway serves `/api/page` itself; static assets and the disclaimer are
+served by that instance's document root. The control page shell is public, while
+state, device commands and Scheduler operations require the separate control login.
+
+Both web-server instances use the installed `/usr/sbin/uhttpd` executable, but have
+separate process supervision, listeners and document roots. Home Controller's
+init script starts its web instance alongside the Go backend. The normal OpenWrt
+uHTTPd service reads `/etc/config/uhttpd` and serves LuCI independently; this package
+does not create a section there. Removing its `main` section affects LuCI, while
+removing the uHTTPd executable/dependency affects both applications.
 
 The Go controller uses the standard library; no Go modules are downloaded. The Go
 runtime is compiled into the executable. Neither Perl nor Python is needed on the
@@ -18,7 +28,10 @@ The authenticated state API does expose the names, symbols and membership needed
 for controls, last-command status, and the next scheduled action.
 LuCI uses native `form.JSONMap`, tabbed sections, `GridSection` tables, modal editors,
 input validation and the standard view action bar. Settings use the active LuCI
-theme; only the disclaimer notice has scoped styling matching Wi-Fi Coordinator.
+theme. The disclaimer notice and compact HTTPS-port help have scoped styling
+matching Wi-Fi Coordinator, including light/dark tooltip colours. The short help
+description exposes the full text on hover, keyboard focus or tap; tap again or
+Escape dismisses it. The explanatory text is also exposed to assistive technology.
 Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
 
@@ -28,6 +41,11 @@ removes the draft; `discard` removes only the draft. The running service reads o
 the active file. RPC `get` distinguishes editable and active settings so pending
 edits do not misrepresent service status. Draft/save/discard methods require LuCI
 write access; `get` and session listing use the application's LuCI read permission.
+Both `stage` and `save` require at least one selected network to have an active
+address, even if the service is disabled. After saving active settings, the RPC
+requests an asynchronous service restart; a successful RPC response does not prove
+that the restarted web/backend processes are healthy. No automatic configuration
+rollback is implemented by these JSON configuration methods.
 `control_order` contains typed device/group keys and a distinct Scheduler key;
 unknown or duplicate keys are rejected, and omitted controls append in default order.
 
@@ -50,6 +68,7 @@ State-changing requests require JSON, a same-origin request when Origin is prese
 and an authenticated session's CSRF token. The token travels in Authorization because
 uHTTPd's CGI implementation forwards only a fixed set of request headers. No CORS
 permission is granted. Login requires JSON and is also origin checked.
+The first control login must be set by an administrator; no credentials are shipped.
 
 ## Network access
 
@@ -61,6 +80,8 @@ themselves. Tunnels outside netifd must be attached to a logical OpenWrt interfa
 before they can be selected. The same selections supply the ingress firewall's
 allowed devices, so an unchecked VPN cannot reach the service through its LAN address.
 Network aliases sharing one underlying device share its ingress permission.
+The selector lists OpenWrt logical interfaces rather than independently classifying
+their security role. Loopback remains permitted for requests from the router itself.
 Devices assigned to the logical networks named `wan` and `wan6` are explicitly
 excluded. This depends on those network names; it is not a classification of every
 possible custom topology. IPv4 and non-link-local IPv6 are supported.
@@ -69,6 +90,9 @@ other interfaces, before normal router input filtering. Existing firewall rules 
 apply: a VPN zone that rejects router input needs an administrator rule allowing this
 port. This package does not broadly open the VPN zone or change LuCI's listener.
 Network hotplug events refresh the service bindings.
+Changing the selected addresses does not renew an existing HTTPS certificate.
+Certificate renewal uses the active configuration and the addresses available then;
+apply network changes before manually renewing when certificate coverage changes.
 
 ## Privilege and storage
 

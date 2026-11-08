@@ -4,6 +4,23 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.6 documentation and package verification (2026-11-08)
+
+- Audited the guides against the current UI, administrator RPC, network selection,
+  TLS generation, service hooks and package builder. Clarified the two uHTTPd
+  instances, help styling, save/restart semantics, network prerequisites, certificate
+  renewal and package removal behavior.
+- Built and signature-verified the 0.2.6-r1 application APK. Checked its extracted
+  backend, radio helper, LuCI assets, control assets, service hooks and canonical
+  disclaimer against the release inputs. Backend and radio artifacts are reused
+  from 0.2.5; this release changes documentation and package version only.
+- Verified local documentation links, matching disclaimer text, source-archive
+  contents and the six-file release checksum manifest. The source ZIP contains a
+  `home-controller/` top-level directory and corresponds to the release commit.
+- Runtime/CI and physical-radio evidence remains in the entries for the versions
+  actually tested. This package was built without installing it, restarting the
+  controller or changing live settings; no new radio trial is claimed.
+
 ## 0.2.5 web-server help (2026-11-08)
 
 - Added compact help under **HTTPS port**, matching Wi-Fi Coordinator's tooltip

@@ -50,9 +50,16 @@ invalidate them. The scheduler's saved Running/Stopped preference is retained.
 When upgrading from 0.2.3 or earlier, the saved network selections now determine
 access immediately: VPN tunnels are no longer added automatically. Select and apply
 any VPN you want to keep using before upgrading, or upgrade from LAN. At least one selected
-network must have an active address. VPN tunnel devices created outside OpenWrt's
+network must have an active address for **Save**, **Save & Apply** and service startup,
+even when preparing settings with the service disabled. VPN tunnel devices created outside OpenWrt's
 network configuration must first be attached to a logical interface under
 **Network → Interfaces**, then selected in **Allowed networks**.
+
+The selector uses OpenWrt's logical network names. The standard `wan` and `wan6`
+networks and their underlying devices are excluded; custom names/topologies are
+not automatically identified as WAN. Existing router firewall rules still apply.
+Interfaces sharing the same underlying device also share its incoming-traffic
+permission. Local requests from the router itself remain permitted.
 
 Both interfaces show the project disclaimer before first use. Acknowledgement is
 remembered in that browser for the exact text. Changed wording asks again; blocked
@@ -65,17 +72,45 @@ or the control page's **Disclaimer** link. The LuCI tab shows a read-only notice
 Save/Apply controls are hidden there. There is no separate Read warning button in General.
 The package also installs the canonical notice at `/usr/share/home-controller/DISCLAIMER.txt`.
 
-Home Controller creates its own HTTPS key. If the router has the `router-ca`
+Home Controller creates its own HTTPS key. If the router has the optional `router-ca`
 Easy-RSA helper, it requests a separate certificate from that local CA; otherwise
 it creates a self-signed certificate that control devices must explicitly trust.
+This package does not install or configure `router-ca`. If that helper is present
+but issuance fails, renewal reports an error rather than switching to self-signed TLS.
 It never copies LuCI's private key. Use **Advanced → HTTPS certificate → Renew certificate**
 before the certificate expires or after changing the hostname or listener addresses.
 The self-signed fallback lasts one year; certificates issued by `router-ca` use that
 helper's configured validity. Renewal is manual and uses the active configuration,
 so apply any address-related settings first.
 The certificate covers the router hostname and selected active addresses. Through
-a VPN, use a covered address or hostname. A custom certificate and key can also be
+a VPN, use a covered address or hostname. Network changes do not automatically
+renew an existing certificate. A custom certificate and key can also be
 installed by the administrator at `/etc/home-controller/tls.crt` and `tls.key`.
+
+## Web server and access
+
+Home Controller and LuCI use the same installed uHTTPd program in separate instances:
+
+| Instance | Managed by | What it serves |
+| --- | --- | --- |
+| Main router web server | `/etc/config/uhttpd`; **Services → uHTTPd** when that LuCI module is installed | LuCI, including Home Controller's administration page |
+| Home Controller web server | **Services → Home Controller**, its own init service | Control login, device buttons and Scheduler Start/Stop; HTTPS 8443 by default |
+
+**Advanced → HTTPS port** and **Allowed networks** affect only the control page.
+Its web server starts and stops with Home Controller. Removing the main uHTTPd
+configuration affects LuCI access, not the separate control service. Both still
+need the installed uHTTPd package. Changing or restarting either web instance does
+not change the other instance's configuration.
+
+The **Settings applied** message means the configuration was saved and a restart was requested.
+It does not confirm that every restarted process succeeded. General's Enabled/Disabled
+value reflects saved configuration; diagnostics show the last runtime snapshot.
+If the control page is unavailable, check the selected networks, active addresses,
+firewall, certificate and the system log. Runtime diagnostics may remain from an
+earlier run when the service is stopped or startup fails. Keep a working management
+connection when changing access settings: these settings have no automatic rollback.
+
+## TellStick ownership
 
 Enabling or restarting Home Controller rewrites `/etc/tellstick.conf` from its active
 configuration and restarts `telldusd`. Preserve an existing configuration before
@@ -172,5 +207,7 @@ configuration; the packaged generic defaults may appear as `config.json.apk-new`
 and are not the active configuration.
 
 Removing Home Controller stops its web/backend service and removes its dedicated
-firewall table. Account settings and existing Telldus configuration should be reviewed
-before purging private files or reusing the transmitter with another application.
+firewall table. It does not restore the previous `/etc/tellstick.conf` or stop/remove
+the independently managed `telldusd` service. Review retained account files and
+Telldus configuration before purging private files or reusing the transmitter with
+another application.

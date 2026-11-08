@@ -18,7 +18,7 @@ weekly and solar schedules, and a replaceable Telldus transport. Initial device 
 is Hasta selflearningv2 blinds (Up, Stop, Down). MQTT is reserved for a future optional adapter.
 
 Users get a small mobile-friendly control page with a shared login and
-remembered sessions. Administrators manage devices, groups, accounts and schedules in
+remembered sessions. Administrators manage devices, groups, the shared login and schedules in
 LuCI. Access is restricted to explicitly selected LAN and VPN networks; WAN is excluded.
 
 LuCI has **General**, **Controls**, **Schedules**, **Access**, **Advanced**, and the
@@ -33,6 +33,7 @@ and account management stay in LuCI.
 - Manual commands leave future schedules active; missed events are skipped.
 - Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
 - Native LuCI forms, tabs and sortable tables, with Save, Save & Apply and Reset.
+- Compact web-server help with Wi-Fi Coordinator-style hover, focus and tap support.
 - One freely ordered list of devices, groups and Scheduler; configurable symbols.
 - Compact two-column phone controls and a desktop grid that uses the available width.
 - Home-screen shortcut icons for Android and iPhone.
@@ -44,6 +45,8 @@ OpenWrt 25.12.6. Other architectures require changing the build target and rebui
 MQTT is a future extension, not a dependency.
 
 Read the [disclaimer](DISCLAIMER.txt), then the [installation guide](docs/INSTALL.md).
+The control page uses its own uHTTPd instance (HTTPS port 8443 by default); its port
+and allowed-network settings do not change LuCI's separate web server.
 See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), and
 [releases](https://github.com/audrius-paskevicius/openwrt-home-controller/releases).
 The [test report](docs/TESTING.md) distinguishes radio verification from physical
