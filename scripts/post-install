@@ -19,5 +19,5 @@ chmod 640 /etc/home-controller/tls.* 2>/dev/null || true
 /etc/init.d/rpcd restart
 /etc/init.d/home-controller enable
 rm -f /tmp/luci-indexcache.*.json
-if [ "$(jsonfilter -i /etc/home-controller/config.json -e '@.enabled')" = true ]; then /etc/init.d/home-controller restart; fi
+if [ "$(jsonfilter -i /etc/home-controller/config.json -e '@.enabled')" = true ]; then /etc/init.d/home-controller start || exit 1; fi
 exit 0

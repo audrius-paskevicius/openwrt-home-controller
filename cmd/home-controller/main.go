@@ -704,6 +704,10 @@ func serve() error {
 		return e
 	}
 	os.Chmod(run+"/api.sock", 0600)
+	if e := atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "history": []Event{}, "queue": 0}); e != nil {
+		ln.Close()
+		return e
+	}
 	go s.worker()
 	go s.scheduler()
 	return (&http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, MaxHeaderBytes: 8192}).Serve(ln)

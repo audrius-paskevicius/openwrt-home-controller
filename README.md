@@ -21,6 +21,8 @@ architectures require rebuilding. MQTT is a future extension, not a v0.1 depende
 Read the [disclaimer](DISCLAIMER.txt), then the [installation guide](docs/INSTALL.md).
 See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), and
 [releases](https://github.com/audrius-paskevicius/openwrt-home-controller/releases).
+The [test report](docs/TESTING.md) distinguishes radio verification from physical
+position feedback.
 
 No household credentials, coordinates, radio addresses, or private keys belong in this repository.
 Local deployment information lives in the ignored `.private/` directory.

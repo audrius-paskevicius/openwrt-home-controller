@@ -27,7 +27,18 @@ SIGN_KEY=/private/home-controller-signing.pem APK_TOOL=/path/to/apk.static sh sc
 ```
 
 Use apk-tools v3 with the `mkpkg` and `adbsign` applets. Re-sign the driver APK with
-the same release key, verify both packages, and publish only sanitized release files.
+the same release key. Work on a copy: signing tools may modify a file even on failure.
+The SDK uses a temporary key, so allow that input only during re-signing:
+
+```
+apk.static adbsign --allow-untrusted --reset-signatures --sign-key /private/home-controller-signing.pem dist/telldus-core-2.1.3_beta1-r10.apk
+apk verify dist/luci-app-home-controller-0.1.0-r1.apk dist/telldus-core-2.1.3_beta1-r10.apk
+```
+
+Verification and installation must use the trusted public key, without
+`--allow-untrusted`. Publish only sanitized release files. The radio build also
+produces the patched corresponding-source archive and the `hasta-test` executable;
+run that test on the target (it calculates packets without transmitting).
 The public verification key belongs in `/etc/apk/keys/` on the target.
 
 `.private/` holds local deployment settings and test evidence; `.tools/` holds local
