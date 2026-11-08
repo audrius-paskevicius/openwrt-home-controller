@@ -21,6 +21,8 @@ printf '<!doctype html><meta http-equiv="refresh" content="0;url=/api/page"><tit
 cp DISCLAIMER.txt "$ROOT/usr/share/home-controller/www/disclaimer.txt"
 for op in login logout state command page scheduler; do printf '#!/bin/sh\nexec /usr/bin/home-controller\n' > "$ROOT/usr/share/home-controller/www/api/$op"; done
 cp luci/home-controller.js "$ROOT/www/luci-static/resources/view/"
+cp luci/disclaimer.js "$ROOT/www/luci-static/resources/home-controller-disclaimer.js"
+cp DISCLAIMER.txt "$ROOT/www/luci-static/resources/home-controller-disclaimer.txt"
 cp files/menu.json "$ROOT/usr/share/luci/menu.d/luci-app-home-controller.json"
 cp files/acl.json "$ROOT/usr/share/rpcd/acl.d/luci-app-home-controller.json"
 printf '/etc/home-controller/\n/etc/tellstick.conf\n' > "$ROOT/lib/upgrade/keep.d/home-controller"
@@ -30,4 +32,4 @@ find "$ROOT" -type f -exec chmod 644 {} \;
 chmod 755 "$ROOT/usr/bin/home-controller" "$ROOT/usr/libexec/home-controller-radio" "$ROOT/usr/libexec/rpcd/home-controller" "$ROOT/etc/init.d/home-controller" "$ROOT/etc/hotplug.d/iface/95-home-controller" "$ROOT/etc/hotplug.d/usb/95-home-controller"
 chmod 755 "$ROOT/usr/share/home-controller/www/api/"*
 mkdir -p dist
-"$APK_TOOL" mkpkg --files "$ROOT" --sign-key "$SIGN_KEY" --info name:luci-app-home-controller --info version:"$VERSION" --info arch:arm_cortex-a9_vfpv3-d16 --info license:GPL-3.0-or-later --info description:'Local household controls and scheduling with separate LuCI administration' --info 'depends:luci-base uhttpd telldus-core>=2.1.3_beta1-r10 nftables jsonfilter' --script "post-install:$BASE/scripts/post-install" --script "post-upgrade:$BASE/scripts/post-install" --script "pre-deinstall:$BASE/scripts/pre-deinstall" --script "pre-upgrade:$BASE/scripts/pre-upgrade" --output "dist/luci-app-home-controller-$VERSION.apk"
+"$APK_TOOL" mkpkg --files "$ROOT" --sign-key "$SIGN_KEY" --info name:luci-app-home-controller --info version:"$VERSION" --info arch:arm_cortex-a9_vfpv3-d16 --info license:GPL-3.0-or-later --info description:'Local device controls and scheduling with separate LuCI administration' --info 'depends:luci-base uhttpd telldus-core>=2.1.3_beta1-r10 nftables jsonfilter' --script "post-install:$BASE/scripts/post-install" --script "post-upgrade:$BASE/scripts/post-install" --script "pre-deinstall:$BASE/scripts/pre-deinstall" --script "pre-upgrade:$BASE/scripts/pre-upgrade" --output "dist/luci-app-home-controller-$VERSION.apk"

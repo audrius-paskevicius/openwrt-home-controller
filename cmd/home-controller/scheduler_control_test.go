@@ -15,11 +15,11 @@ func TestSchedulerStopResumeAndPersistence(t *testing.T) {
 	s.config.Schedules = []Schedule{{ID: "morning", Enabled: true, Target: "blind", Action: "up", Days: []int{1}, Event: "time", Time: "08:00"}}
 	at := time.Date(2026, 11, 9, 8, 0, 0, 0, time.UTC)
 	s.enqueue("blind", "up", "schedule")
-	s.enqueue("manual", "down", "household")
+	s.enqueue("manual", "down", "manual")
 	if err := s.setScheduler(true, at.Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if len(s.queue) != 1 || s.queue[0].Source != "household" {
+	if len(s.queue) != 1 || s.queue[0].Source != "manual" {
 		t.Fatal("stop removed manual command or retained scheduled command")
 	}
 	s.due(at.Add(-time.Second), at, map[string]bool{})

@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// Use a separate server identity: the household process must not read LuCI's key.
+// Use a separate server identity: the control process must not read LuCI's key.
 func renewTLS() error {
 	c, err := loadConfig()
 	if err != nil {
@@ -48,7 +48,7 @@ func renewTLS() error {
 		defer cancel()
 		out, e := exec.CommandContext(ctx, "/usr/sbin/router-ca", "--batch", "--use-algo=ec", "--curve=prime256v1", "--san="+strings.Join(sans, ","), "build-server-full", name, "nopass").CombinedOutput()
 		if e != nil {
-			return fmt.Errorf("household certificate issuance failed: %v: %s", e, out)
+			return fmt.Errorf("control certificate issuance failed: %v: %s", e, out)
 		}
 		cert, err = os.ReadFile("/etc/easy-rsa/pki/issued/" + name + ".crt")
 		if err != nil {

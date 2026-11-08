@@ -1,63 +1,56 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-
-// Exercise the actual LuCI event handlers and their inline feedback without a router.
-class Element {
- constructor(tag, attrs = {}, children = []) {
-  this.tag = tag; this.attrs = attrs; this.children = []; this.style = {};
-  this.value = attrs.value || ''; this.disabled = false; this.events = {};
-  this.classList = {toggle:()=>{}};
-  this.append(...(Array.isArray(children) ? children : [children]));
- }
- append(...children) { this.children.push(...children); }
- replaceChildren(...children) { this.children = children; }
- setAttribute(key, value) { this.attrs[key] = value; }
- get firstChild() { return this.children[0]; }
- querySelector(selector) { const tag=selector.split('[')[0];return descendants(this).find(e=>e!==this&&e.tag===tag); }
- get textContent() { return this.children.map(c => typeof c === 'string' ? c : c.textContent).join(''); }
- set textContent(text) { this.children = [text]; }
- addEventListener(name, handler) { this.events[name] = handler; }
- focus() { this.focused = true; }
- click() { return this.attrs.click?.(); }
+const assert=require('node:assert/strict'),fs=require('node:fs');
+// Exercise our form model and handlers. Native LuCI rendering is also checked on
+// the target router with synthetic RPCs; these stubs do not imitate its CSS.
+class Node {
+ constructor(tag,attrs={},children=[]){this.tag=tag;this.attrs=attrs;this.children=[];this.classList={toggle(){}};this.append(...(Array.isArray(children)?children:[children]));}
+ append(...items){this.children.push(...items);}replaceChildren(...items){this.children=items;}
+ set textContent(v){this.children=[v];}get textContent(){return this.children.map(x=>typeof x==='string'?x:x?.textContent||'').join('');}
+ replaceWith(){}querySelector(){return null;}
 }
-function descendants(e) { return [e, ...e.children.filter(c => c instanceof Element).flatMap(descendants)]; }
-
-(async () => {
- const calls = [];
- let respond = () => Promise.resolve({ok:true});
- const rpc = {declare: spec => (...args) => { calls.push({method:spec.method,args}); return respond(); }};
- const ui={addNotification:()=>assert.fail('Account feedback must be inline'),tabs:{initTabGroup:()=>{}},
-  Textfield:class {constructor(value,options){this.value=value;this.options=options;}render(){return new Element('div',{},[new Element('input',{type:this.options.password?'password':'text',value:this.value})]);}},
-  Select:class {constructor(value){this.value=value;}render(){return new Element('div',{},[new Element('select',{value:this.value})]);}},
-  Checkbox:class {constructor(value){this.value=value;}render(){const input=new Element('input',{type:'checkbox'});input.checked=this.value==='1';return new Element('div',{},[input,new Element('label')]);}}
- };
- const view = new Function('view', 'rpc', 'ui', 'E', 'poll', fs.readFileSync('luci/home-controller.js','utf8'))(
-  {extend:x=>x}, rpc, ui,
-  (tag, attrs, children) => new Element(tag, attrs, children), {add:()=>{}});
- const root = view.render({config:JSON.parse(fs.readFileSync('files/config.json')), account:'household', controllers:[]});
- const account = descendants(root).find(e=>e.tag==='div' && e.children[0]?.textContent==='Household account');
- const nodes = descendants(account), inputs = nodes.filter(e=>e.tag==='input');
- const button = nodes.find(e=>e.tag==='button' && e.textContent==='Set household password');
- const feedback = nodes.find(e=>e.attrs.role==='status');
- const pass = inputs.find(e=>e.attrs.type==='password');
- await button.click();
- assert.equal(calls.length,0); assert.match(feedback.textContent,/Enter a new password/);
- pass.value='short';
- respond=()=>Promise.resolve({error:'Server rejected this request'});
- await button.click();
- assert.equal(calls.at(-1).args[1],'short'); assert.match(feedback.textContent,/Server rejected/);
- assert.equal(pass.value,'short'); assert.equal(button.disabled,false);
- respond=()=>Promise.reject(new Error('Connection failed'));
- await button.click(); assert.match(feedback.textContent,/Connection failed/);
- let complete;
- respond=()=>new Promise(resolve=>{complete=resolve;});
- const saving=button.click(), count=calls.length;
- assert.equal(button.disabled,true); assert.match(feedback.textContent,/Saving password/);
- await button.click(); assert.equal(calls.length,count);
- complete({ok:true}); await saving;
- assert.equal(button.disabled,false); assert.equal(pass.value,'');
- assert.match(feedback.textContent,/Password changed/);
- pass.value='x'.repeat(257);
- await button.click(); assert.equal(calls.length,count); assert.match(feedback.textContent,/256/);
- console.log('PASS: short password submitted; inline empty/error/network/pending/success feedback; duplicate submissions blocked');
-})().catch(e=>{console.error(e);process.exit(1);});
+const E=(...args)=>new Node(...args);
+class Option {
+ constructor(section,name,title){this.map=section.map;this.option=name;this.title=title;this.keylist=[];}
+ value(k){this.keylist.push(k);return this;}depends(){}cfgvalue(sid){return this.map.data.get('json',sid,this.option);}
+ formvalue(sid){return this.inputValue??this.cfgvalue(sid);}
+ getUIElement(){return {setValue:v=>{this.inputValue=v;}};}renderWidget(){return E('button',{},this.inputtitle);}
+}
+class Section {
+ constructor(map,type){this.map=map;this.type=type;this.children=[];}
+ option(Type,name,title,...args){const o=new Type(this,name,title);if(Type===SectionValue)o.subsection=new Section(this.map,args[0]);this.children.push(o);return o;}
+ getOption(name){return this.children.find(o=>o.option===name);}
+}
+class SectionValue extends Option {}
+class JSONMap {
+ constructor(model){const records=[];for(const [type,values] of Object.entries(model))for(const [i,v] of (Array.isArray(values)?values:[values]).entries())records.push({...v,'.type':type,'.name':v['.name']||(Array.isArray(values)?type+i:type)});
+  this.data={sections:(_c,t)=>records.filter(r=>r['.type']===t),get:(_c,s,o)=>{const r=records.find(r=>r['.name']===s);return o?(r?.[o]==null?null:String(r[o])):r;},set:(_c,s,o,v)=>{records.find(r=>r['.name']===s)[o]=v;}};this.children=[];
+ }
+ section(Type,id,...args){const s=new Section(this,Type===Section?args[0]:id);this.children.push(s);return s;}
+ async render(){return this.root=E('div');}async save(){}
+}
+const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Value:Option,ListValue:Option,MultiValue:Option,Flag:Option,DummyValue:Option,Button:Option,SectionValue};
+(async()=>{
+ const calls=[];let respond=()=>Promise.resolve({ok:true});
+ const config=JSON.parse(fs.readFileSync('files/config.json'));config.devices=[{id:'sample',name:'Blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All',devices:['sample']}];
+ const data={config,account:'home',controllers:[],sunwait:true};
+ const rpc={declare:spec=>(...args)=>{calls.push({method:spec.method,args});return spec.method==='get'?Promise.resolve(data):respond();}};
+ const view=new Function('view','rpc','ui','form','poll','warning','E',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{},form,{add(){}},{gate:(_t,f)=>f()},E);
+ await view.render(data);
+ const access=view.map.children.find(s=>s.type==='access'),pass=access.getOption('_password'),button=access.getOption('_password_action');
+ const message=button.renderWidget().children[1],event={currentTarget:{disabled:true}}; // LuCI disables before invoking onclick.
+ await button.onclick(event);assert.match(message.textContent,/Enter a new password/);assert.equal(calls.length,0);
+ pass.inputValue='short';respond=()=>Promise.resolve({error:'Server rejected this request'});
+ await button.onclick(event);assert.equal(calls.at(-1).args[1],'short');assert.match(message.textContent,/Server rejected/);assert.equal(pass.inputValue,'short');
+ respond=()=>Promise.reject(Error('Connection failed'));await button.onclick(event);assert.match(message.textContent,/Connection failed/);
+ let complete;respond=()=>new Promise(r=>{complete=r;});const pending=button.onclick(event),count=calls.length;
+ await button.onclick(event);assert.equal(calls.length,count);assert.equal(event.currentTarget.disabled,true);
+ complete({ok:true});await pending;assert.equal(pass.inputValue,'');assert.match(message.textContent,/Password changed/);
+ pass.inputValue='x'.repeat(257);await button.onclick(event);assert.equal(calls.length,count);assert.match(message.textContent,/256/);
+ respond=()=>Promise.resolve({ok:true});pass.inputValue='';
+ view.map.data.set('json','access','session_days','7');await view.handleSave();assert.equal(calls.at(-1).method,'stage');
+ let saved=JSON.parse(calls.at(-1).args[0]);assert.equal(saved.session_days,7);assert.deepEqual(saved.control_order,['device:sample','scheduler','group:all']);assert.equal(saved.groups[0].devices[0],'sample');assert.equal(saved.devices[0].unit,0);
+ assert.ok(!JSON.stringify(saved).includes('_password'));assert.ok(!JSON.stringify(saved).includes('short'));
+ await view.handleSaveApply();assert.equal(calls.at(-1).method,'save');
+ respond=()=>Promise.resolve({error:'Synthetic save failure'});await view.handleSave();assert.match(view.saveMessage.textContent,/Synthetic save failure/);
+ respond=()=>Promise.resolve({ok:true});await view.handleReset();assert.equal(calls.at(-2).method,'discard');assert.equal(view.map.data.get('json','access','session_days'),'30');
+ console.log('PASS: native-form handlers, password feedback and duplicate guard, Save/Apply/Reset, configuration conversion and credential exclusion');
+})().catch(e=>{console.error(e);process.exitCode=1;});

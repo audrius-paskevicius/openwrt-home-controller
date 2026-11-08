@@ -1,1 +1,1 @@
-{"luci-app-home-controller":{"description":"Manage Home Controller","read":{"ubus":{"home-controller":["get","sessions"]}},"write":{"ubus":{"home-controller":["save","password","revoke","tls"]}}}}
+{"luci-app-home-controller":{"description":"Manage Home Controller","read":{"ubus":{"home-controller":["get","sessions"]}},"write":{"ubus":{"home-controller":["save","stage","discard","password","revoke","tls"]}}}}

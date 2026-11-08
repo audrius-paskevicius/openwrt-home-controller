@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestSymbolsValidationAndHouseholdState(t *testing.T) {
+func TestSymbolsValidationAndControlsState(t *testing.T) {
 	for _, icon := range []string{"", "none", "blind", "clock", "lamp", "plug", "fan"} {
 		c := exampleConfig()
 		c.Devices[0].Icon = icon
@@ -37,6 +37,7 @@ func TestSymbolsValidationAndHouseholdState(t *testing.T) {
 	s.config.Devices[0].Icon = "lamp"
 	s.config.Groups[0].Icon = "none"
 	s.config.SchedulerIcon = "fan"
+	s.config.ControlOrder = []string{"group:all", "scheduler", "device:blind"}
 	tok := strings.Repeat("a", 64)
 	s.sessions = []Session{{Hash: hash(tok), CSRF: "csrf", Expires: time.Now().Add(time.Hour).Unix(), Revision: "revision"}}
 	w := request(s, "GET", "/api/state", "", map[string]string{"Cookie": cookieName + "=" + tok})
@@ -44,8 +45,12 @@ func TestSymbolsValidationAndHouseholdState(t *testing.T) {
 		Devices       []Device `json:"devices"`
 		Groups        []Group  `json:"groups"`
 		SchedulerIcon string   `json:"scheduler_icon"`
+		ControlOrder  []string `json:"control_order"`
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &state) != nil || state.Devices[0].Icon != "lamp" || state.Groups[0].Icon != "none" || state.SchedulerIcon != "fan" {
-		t.Fatal("symbols absent from household state", w.Code)
+		t.Fatal("symbols absent from control state", w.Code)
+	}
+	if strings.Join(state.ControlOrder, ",") != "group:all,scheduler,device:blind" {
+		t.Fatal("control order absent from control state")
 	}
 }

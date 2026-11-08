@@ -1,6 +1,6 @@
 # Architecture and boundaries
 
-The household site and LuCI are different applications. A dedicated uHTTPd instance
+The control site and LuCI are different applications. A dedicated uHTTPd instance
 serves Home Controller over HTTPS. It runs as `homecontroller`, with its own document
 root and no ubus or LuCI endpoint. Its CGI gateway forwards only login, logout, state,
 device-command and scheduler Start/Stop requests to a private Unix socket. The page response prohibits
@@ -12,16 +12,29 @@ router. A small C helper calls the Telldus library's Up, Down and Stop functions
 The patched Telldus daemon performs USB communication.
 
 The LuCI page calls an administrator-only rpcd plugin. It validates configuration
-before applying it. Household access never grants a router session or exposes
+before applying it. Control access never grants a router session or exposes
 configuration, command execution, arbitrary file access, or radio addresses.
-LuCI uses its native tab manager and input widgets, with standard theme classes
-for sections, forms and tables; no Home Controller administration stylesheet is
-loaded. Household symbols are fixed SVG paths selected by a validated name,
+LuCI uses native `form.JSONMap`, tabbed sections, `GridSection` tables, modal editors,
+input validation and the standard view action bar. No administration stylesheet is
+loaded. Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
+
+The JSON configuration has a separate root-only `pending.json` draft. RPC `stage`
+validates and stores it; `save` activates validated settings in `config.json` and
+removes the draft; `discard` removes only the draft. The running service reads only
+the active file. RPC `get` distinguishes editable and active settings so pending
+edits do not misrepresent service status. These methods require LuCI write access.
+`control_order` contains typed device/group keys and a distinct Scheduler key;
+unknown or duplicate keys are rejected, and omitted controls append in default order.
+
+Both interfaces load package-installed copies of the canonical `DISCLAIMER.txt`.
+They remember its exact text in local browser storage, with an in-memory fallback.
+This acknowledgement is a UI gate, not an API authorization mechanism; authentication
+and CSRF checks remain enforced independently.
 
 ## Authentication
 
-The shared household account has an independently salted PBKDF2-HMAC-SHA256 password
+The shared control account has an independently salted PBKDF2-HMAC-SHA256 password
 hash (210,000 iterations). Random 256-bit bearer cookies are stored hashed on the
 server. Cookies are Secure, HttpOnly, SameSite=Strict and host-only. Remembered sessions
 expire after the configured duration (30 days by default); ordinary sessions have a
@@ -49,10 +62,10 @@ Network hotplug events refresh the service bindings.
 
 ## Privilege and storage
 
-The controller and household web server run as `homecontroller`. Their configuration
+The controller and control web server run as `homecontroller`. Their configuration
 directory is root-owned; configuration and credential files are root-owned and group
 readable. Only session/scheduler state storage and the runtime directory are writable by the service.
-The separate household HTTPS private key is root-owned and group-readable by the
+The separate control HTTPS private key is root-owned and group-readable by the
 dedicated web server. LuCI's key and the router CA's key are never shared with it.
 Privileged application of network rules, service configuration and account changes
 is restricted to LuCI administration. The Telldus daemon is a separate upstream
@@ -65,7 +78,7 @@ Unknown device position is explicit: a successful send is not a position measure
 
 ## Commands and schedules
 
-One queue handles all household and scheduled commands. A newer command replaces a
+One queue handles all control and scheduled commands. A newer command replaces a
 queued command for the same device. Stop is placed before other queued movement.
 An already executing radio call is bounded by a timeout; Stop cannot interrupt a
 packet already being transmitted. Queued commands expire instead of replaying stale
@@ -78,7 +91,7 @@ converted using the selected time zone. `router` follows OpenWrt's zone name. A 
 offset is applied before optional earliest/latest bounds. Missing solar events are
 skipped unless a fallback time is set. Fixed-time schedules do not require sunwait.
 
-Household Scheduler Stop persists before taking effect, cancels waiting scheduled
+Control Scheduler Stop persists before taking effect, cancels waiting scheduled
 commands and prevents future scheduled sends. Manual commands remain available.
 It cannot interrupt an in-flight radio call and does not send Stop to the blinds.
 Start clips the evaluation interval to its resume time, avoiding missed-event replay.

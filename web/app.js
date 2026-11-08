@@ -1,5 +1,7 @@
 'use strict';
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
+let disclaimer='',acknowledged=false,warningOpen=false;
+const warningKey='home-controller-disclaimer';
 const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
 async function api(path,body){
@@ -10,7 +12,32 @@ async function api(path,body){
   if(!response.ok){if(response.status===401)showLogin();throw Error(data.error||'Request failed');}return data;
  }finally{clearTimeout(timeout);}
 }
-function showLogin(){revision++;signedIn=false;csrf='';signature='';$('login').hidden=false;$('controls').hidden=true;$('logout').hidden=true;}
+function showLogin(){revision++;signedIn=false;csrf='';signature='';$('login').hidden=warningOpen;$('controls').hidden=true;$('logout').hidden=true;}
+function showWarning(){
+ revision++;warningOpen=true;$('login').hidden=true;$('controls').hidden=true;$('logout').hidden=true;document.querySelector('footer').hidden=true;
+ const panel=$('warning');panel.replaceChildren();
+ disclaimer.trim().split(/\n\s*\n/).forEach((text,i)=>{const p=document.createElement(i?'p':'h1');if(!i)p.id='warning-title';p.textContent=text;panel.append(p);});
+ if(!acknowledged){const note=document.createElement('p');note.className='warning-note';note.textContent='Acknowledgement is remembered in this browser for this router. It does not change the running service or scheduler.';panel.append(note);}
+ const button=document.createElement('button');button.type='button';button.textContent=acknowledged?'Back':'I understand — continue';
+ button.onclick=()=>{acknowledged=true;try{localStorage.setItem(warningKey,disclaimer);}catch(e){}warningOpen=false;panel.hidden=true;document.querySelector('footer').hidden=false;$('login').hidden=signedIn;$('controls').hidden=!signedIn;$('logout').hidden=!signedIn;refresh();};
+ panel.append(button);panel.hidden=false;panel.focus();
+}
+async function initialize(){
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+ try{
+  const response=await fetch('/disclaimer.txt',{cache:'no-store',credentials:'same-origin',signal:controller.signal});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  disclaimer=await response.text();if(!disclaimer.trim())throw Error('The warning is empty.');
+  try{acknowledged=localStorage.getItem(warningKey)===disclaimer;}catch(e){}
+  $('warning').hidden=true;put($('message'),'');warningOpen=false;
+  if(acknowledged){document.querySelector('footer').hidden=false;await refresh();}else showWarning();
+ }catch(e){
+  warningOpen=true;$('login').hidden=true;$('controls').hidden=true;$('logout').hidden=true;
+  const panel=$('warning'),title=document.createElement('h1'),message=document.createElement('p'),retry=document.createElement('button');
+  title.id='warning-title';title.textContent='Unable to load warning';message.textContent='Please retry before continuing. '+e.message;retry.type='button';retry.textContent='Retry';retry.onclick=()=>{retry.disabled=true;initialize();};
+  panel.replaceChildren(title,message,retry);panel.hidden=false;
+ }finally{clearTimeout(timeout);}
+}
 function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+new Date(state.at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
 const symbolPaths={
  blind:'M4 3h16v14H4z M4 6h16M4 9h16M4 12h16M4 15h16M20 3v18M18 21h4',
@@ -51,9 +78,9 @@ function renderScheduler(state){
  put(next,detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){
- if(refreshing)return;refreshing=true;const before=revision;
- try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon]),groups,data.scheduler_icon]);
-  if(key!==signature){$('controls').replaceChildren(...data.devices.map(d=>card(d,false)),schedulerCard(data.scheduler_icon),...groups.map(g=>card(g,true)));signature=key;}
+ if(refreshing||!acknowledged||warningOpen)return;refreshing=true;const before=revision;
+ try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon]),groups,data.scheduler_icon,data.control_order]);
+  if(key!==signature){const cards=new Map([...data.devices.map(d=>['device:'+d.id,card(d,false)]),['scheduler',schedulerCard(data.scheduler_icon)],...groups.map(g=>['group:'+g.id,card(g,true)])]);const order=[...new Set([...(data.control_order||[]),...cards.keys()])];$('controls').replaceChildren(...order.filter(id=>cards.has(id)).map(id=>cards.get(id)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
   for(const d of data.devices){const el=[...$('controls').children].find(x=>x.dataset.id===d.id);if(!el)continue;put(el.querySelector('.status'),statusText(d.state));el.classList.toggle('error',!!d.state.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(d.state.status));}
   for(const g of groups){const el=[...$('controls').children].find(x=>x.dataset.id===g.id),states=data.devices.filter(d=>g.devices.includes(d.id)).map(d=>d.state);let text='Positions unknown';const failed=states.find(s=>s.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(s.status));if(failed)text='Some commands failed';else if(states.some(s=>s.status==='Queued'))text='Commands queued';else if(states.length&&states.every(s=>s.status==='Sent (position unknown)'&&s.action===states[0].action))text=labels[states[0].action]+' sent to all';else if(states.some(s=>s.status))text='See individual results';put(el.querySelector('.status'),text);el.classList.toggle('error',!!failed);}
@@ -63,4 +90,5 @@ async function refresh(){
 }
 $('login').onsubmit=async event=>{event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;put($('login-message'),'Signing in…');try{const data=await api('login',{user:$('username').value,password:$('password').value,remember:$('remember').checked});csrf=data.csrf;$('password').value='';put($('login-message'),'');await refresh();}catch(e){put($('login-message'),e.message);}finally{button.disabled=false;}};
 $('logout').onclick=async()=>{try{await api('logout',{});showLogin();put($('message'),'');}catch(e){put($('message'),e.message);}};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});setInterval(()=>{if(signedIn&&!document.hidden)refresh();},5000);refresh();
+$('warning-link').onclick=event=>{if(disclaimer){event.preventDefault();showWarning();}};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});setInterval(()=>{if(signedIn&&!document.hidden)refresh();},5000);initialize();

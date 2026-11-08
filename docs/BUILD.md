@@ -43,15 +43,18 @@ produces the patched corresponding-source archive and the `hasta-test` executabl
 run that test on the target (it calculates packets without transmitting).
 The public verification key belongs in `/etc/apk/keys/` on the target.
 
-`node tests/browser-ui.cjs` exercises both interfaces in a disposable headless Chrome
-listening on localhost:9222 (Node 24 or later). It injects synthetic API/RPC responses
+`node tests/browser-ui.cjs` exercises the control page in a disposable headless Chrome
+listening on localhost:9222 (Node 24 or later). It injects synthetic API responses
 and never contacts a router or sends radio commands. It checks mobile layouts,
-control ordering, scheduler interaction, editors and inline save/error feedback.
-Set `UI_SCREENSHOTS=1` to save household screenshots under ignored `.private/`.
+control ordering and scheduler interaction. `node tests/account-ui.cjs` checks the
+LuCI form model, password feedback and Save/Apply/Reset handlers with stubbed form
+components. `node tests/warning-ui.cjs` checks acknowledgement and storage behavior
+for both interfaces. Native LuCI rendering is checked separately on the target.
+Set `UI_SCREENSHOTS=1` to save control screenshots under ignored `.private/`.
 
 `.private/` holds local deployment settings and test evidence; `.tools/` holds local
 development tools. Both are excluded from Git. Do not publish them, browser profiles,
-cookies, private signing keys, TLS keys, household coordinates or radio addresses.
+cookies, private signing keys, TLS keys, control coordinates or radio addresses.
 Generate release archives from tracked files, not by archiving the whole working
 directory. A locally self-contained folder may contain private deployment material;
 a public source archive must not.

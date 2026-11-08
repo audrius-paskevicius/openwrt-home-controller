@@ -38,7 +38,7 @@ func rpc() error {
 		return errors.New("administrator required")
 	}
 	if len(os.Args) > 2 && os.Args[2] == "list" {
-		fmt.Print(`{"get":{},"save":{"config":""},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
+		fmt.Print(`{"get":{},"save":{"config":""},"stage":{"config":""},"discard":{},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
 		return nil
 	}
 	if len(os.Args) < 4 {
@@ -77,8 +77,17 @@ func rpc() error {
 		if !c.Enabled || !connected {
 			active = nil
 		}
-		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "networks": availableNetworks(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
-	case "save":
+		editable, pending, e := editableConfig(base, c)
+		if e != nil {
+			return errResult(e)
+		}
+		respond(map[string]any{"config": editable, "active_config": c, "pending": pending, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "networks": availableNetworks(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
+	case "discard":
+		if e := discardConfig(base); e != nil {
+			return errResult(e)
+		}
+		respond(map[string]bool{"ok": true})
+	case "save", "stage":
 		var args struct {
 			Config     string `json:"config"`
 			RPCSession string `json:"ubus_rpc_session"`
@@ -93,11 +102,13 @@ func rpc() error {
 		if _, _, e := networkAccess(c); e != nil {
 			return errResult(e)
 		}
-		if e := atomicJSON(base+"/config.json", c); e != nil {
+		if e := storeConfig(base, c, method == "save"); e != nil {
 			return errResult(e)
 		}
-		adminFile(base + "/config.json")
-		restart()
+		if method == "save" {
+			adminFile(base + "/config.json")
+			restart()
+		}
 		respond(map[string]bool{"ok": true})
 	case "password":
 		var args struct {
@@ -108,7 +119,7 @@ func rpc() error {
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
 		}
-		if e := validateHouseholdAccount(args.User, args.Password); e != nil {
+		if e := validateSharedAccount(args.User, args.Password); e != nil {
 			return errResult(e)
 		}
 		c := Credential{User: args.User, Salt: token(), Revision: token()}
@@ -178,7 +189,7 @@ func controllers() []map[string]string {
 
 // Keep the automatically chosen device while it is connected. With no previous
 // device, sysfs enumeration provides a stable USB-port order. Never require a
-// household administrator to bind configuration to a particular serial number.
+// control administrator to bind configuration to a particular serial number.
 func selectController(available []map[string]string, previous string) map[string]string {
 	for _, usb := range available {
 		if previous != "" && usb["serial"] == previous {

@@ -76,6 +76,7 @@ type Config struct {
 	Groups        []Group    `json:"groups"`
 	Schedules     []Schedule `json:"schedules"`
 	SchedulerIcon string     `json:"scheduler_icon,omitempty"`
+	ControlOrder  []string   `json:"control_order,omitempty"`
 }
 type Credential struct {
 	User     string `json:"user"`
@@ -188,7 +189,7 @@ func passwordHash(password, salt string) string {
 	return hex.EncodeToString(out)
 }
 
-func validateHouseholdAccount(user, password string) error {
+func validateSharedAccount(user, password string) error {
 	if !idRE.MatchString(user) {
 		return errors.New("username must start with a lowercase letter and contain only lowercase letters, numbers, hyphens or underscores (up to 32 characters)")
 	}
@@ -209,6 +210,9 @@ func validTime(s string, optional bool) bool {
 	return e == nil && len(s) == 5
 }
 func validate(c Config) error {
+	if err := validateControlOrder(c); err != nil {
+		return err
+	}
 	if !validIcon(c.SchedulerIcon) {
 		return errors.New("invalid scheduler symbol")
 	}
@@ -455,7 +459,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, d := range s.config.Devices {
 			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "state": s.states[d.ID]})
 		}
-		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon})
+		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon, "control_order": orderedControlKeys(s.config)})
 	case "/api/scheduler":
 		if r.Method != "POST" {
 			fail(w, 405, "POST required")
@@ -486,7 +490,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "invalid command")
 			return
 		}
-		if e := s.enqueue(v.Target, v.Action, "household"); e != nil {
+		if e := s.enqueue(v.Target, v.Action, "manual"); e != nil {
 			fail(w, 400, e.Error())
 			return
 		}

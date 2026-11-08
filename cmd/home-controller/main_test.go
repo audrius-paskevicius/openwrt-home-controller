@@ -65,21 +65,21 @@ func TestPasswordKDF(t *testing.T) {
 		t.Fatal("KDF mismatch")
 	}
 }
-func TestHouseholdPasswordChoice(t *testing.T) {
+func TestSharedPasswordChoice(t *testing.T) {
 	for _, p := range []string{"x", "short", " å ", strings.Repeat("å", 256)} {
-		if err := validateHouseholdAccount("household", p); err != nil {
+		if err := validateSharedAccount("manual", p); err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, p := range []string{"", strings.Repeat("x", 257), strings.Repeat("å", 257)} {
-		if validateHouseholdAccount("household", p) == nil {
+		if validateSharedAccount("manual", p) == nil {
 			t.Fatal("accepted empty or excessive password")
 		}
 	}
 	s := testServer()
-	s.cred = Credential{User: "household", Salt: "test-salt", Hash: passwordHash("short", "test-salt"), Revision: "test"}
+	s.cred = Credential{User: "manual", Salt: "test-salt", Hash: passwordHash("short", "test-salt"), Revision: "test"}
 	// Exercise the real login handler without touching persistent session storage.
-	w := request(s, "POST", "/api/login", `{"user":"household","password":"wrong"}`, map[string]string{"Content-Type": "application/json"})
+	w := request(s, "POST", "/api/login", `{"user":"manual","password":"wrong"}`, map[string]string{"Content-Type": "application/json"})
 	if w.Code != 401 {
 		t.Fatalf("incorrect password: %d", w.Code)
 	}
@@ -108,7 +108,7 @@ func request(s *Server, method, path, body string, headers map[string]string) *h
 	s.ServeHTTP(w, r)
 	return w
 }
-func TestHouseholdAuthorization(t *testing.T) {
+func TestControlsAuthorization(t *testing.T) {
 	s := testServer()
 	tok := strings.Repeat("a", 64)
 	s.sessions = []Session{{Hash: hash(tok), CSRF: "csrf", Expires: time.Now().Add(time.Hour).Unix(), Revision: "revision"}}
@@ -118,7 +118,7 @@ func TestHouseholdAuthorization(t *testing.T) {
 	}
 	for _, path := range []string{"/admin/save", "/api/save", "/api/password"} {
 		if request(s, "POST", path, `{}`, headers).Code != 404 {
-			t.Fatal("household management route")
+			t.Fatal("control management route")
 		}
 	}
 	bad := map[string]string{}
@@ -170,7 +170,7 @@ func TestScheduleDowntimeAndManual(t *testing.T) {
 	if len(s.queue) != 0 {
 		t.Fatal("replayed downtime")
 	}
-	s.enqueue("blind", "down", "household")
+	s.enqueue("blind", "down", "manual")
 	s.due(now.Add(-5*time.Second), now, seen)
 	if len(s.queue) != 1 || s.queue[0].Action != "up" {
 		t.Fatal("manual command disabled future schedule")
