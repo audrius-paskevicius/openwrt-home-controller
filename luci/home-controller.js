@@ -81,9 +81,18 @@ function configuration(m,original){
   time:s.event==='time'?s.time:'',offset:s.event==='time'?0:Number(s.offset||0),earliest:s.event==='time'?'':s.earliest||'',latest:s.event==='time'?'':s.latest||'',fallback:s.event==='time'?'':s.fallback||''}));
  return c;
 }
+function dateText(value,timeZone,withDate=true){
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return 'Unknown time';
+ const parts=new Intl.DateTimeFormat('en-GB',{calendar:'iso8601',numberingSystem:'latn',hourCycle:'h23',
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'longOffset',...(timeZone?{timeZone}:{})}).formatToParts(date);
+ const p=Object.fromEntries(parts.map(x=>[x.type,x.value])),clock=p.hour+':'+p.minute;
+ if(!withDate)return clock;
+ const offset=p.timeZoneName.replace(/^(GMT|UTC)/,'').replace(/^\+00:00$/,'')||'Z';
+ return p.year+'-'+p.month+'-'+p.day+'T'+clock+':'+p.second+offset;
+}
 function nextText(state){
  if(!state)return 'Waiting for service status';if(!state.running)return 'Stopped';if(!state.enabled_schedules)return 'Running · no schedules enabled';if(!state.next)return 'Running · no event in the next week';
- return 'Running · '+state.next.target+' · '+actions[state.next.action]+' · '+new Date(state.next.at).toLocaleString([],{weekday:'short',hour:'2-digit',minute:'2-digit',timeZone:state.timezone});
+ return 'Running · '+state.next.target+' · '+actions[state.next.action]+' · '+dateText(state.next.at,state.timezone);
 }
 return view.extend({
  load(){return Promise.all([get().then(result),warning.load()]).then(([data,text])=>({...data,disclaimer:text}));},
@@ -152,7 +161,7 @@ return view.extend({
   });
   value(access,'session_days','Remember sign-in (days)','and(uinteger,range(1,90))');const sessionList=E('div');
   command(access,'_sessions','Signed-in devices','Show devices',async()=>{
-   const items=result(await sessions()).sessions,rows=items.map(s=>E('tr',{class:'tr'},[s.device||'Browser',new Date(s.created*1000).toLocaleString(),new Date(s.expires*1000).toLocaleString()].map(v=>E('td',{class:'td'},v))));
+   const items=result(await sessions()).sessions,rows=items.map(s=>E('tr',{class:'tr'},[s.device||'Browser',dateText(s.created*1000),dateText(s.expires*1000)].map(v=>E('td',{class:'td'},v))));
    sessionList.replaceChildren(items.length?E('table',{class:'table'},[E('tr',{class:'tr table-titles'},['Device','Signed in','Expires'].map(t=>E('th',{class:'th'},t))),...rows]):E('p',{},'No active sessions.'));return '';
   });
   dummy(access,'_session_list','',()=>sessionList);command(access,'_revoke','Sessions','Sign out all devices',async()=>{result(await revoke());sessionList.replaceChildren();return 'All sessions have been signed out.';});
@@ -162,7 +171,7 @@ return view.extend({
   o=choice(advanced,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
   o.validate=(_sid,v)=>list(v).length?true:'Select at least one LAN or VPN network.';
   command(advanced,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
-  command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},null,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
+  command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},(k,v)=>k==='at'&&typeof v==='number'?dateText(v*1000):v,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');
   disclaimer.render=()=>E('div',{'class':'cbi-section','data-tab':'disclaimer','data-tab-title':disclaimer.title},warning.page(this.disclaimer));
   const node=await m.render();node.append(E('link',{rel:'stylesheet',href:L.resource('home-controller-help.css')+'?v=025'}));

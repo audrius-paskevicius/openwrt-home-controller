@@ -32,6 +32,7 @@ and account management stay in LuCI.
 - Solar offsets, time bounds, and optional fallback when a solar event does not occur.
 - Manual commands leave future schedules active; missed events are skipped.
 - Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
+- Consistent 24-hour times and ISO 8601 date-times with time-zone offsets.
 - Native LuCI forms, tabs and sortable tables, with Save, Save & Apply and Reset.
 - Compact web-server help with Wi-Fi Coordinator-style hover, focus and tap support.
 - One freely ordered list of devices, groups and Scheduler; configurable symbols.

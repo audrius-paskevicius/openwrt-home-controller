@@ -4,6 +4,19 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.7 time display (2026-11-08)
+
+- Control-page tests verify `HH:mm` command times and ISO 8601 date-times with
+  US and Arabic browser locales, midnight, the repeated daylight-saving hour,
+  negative offsets, a 45-minute offset and UTC. Layout and warning tests passed.
+- LuCI form tests verify the configured schedule time zone and browser-local
+  session dates. The installed LuCI session table displayed ISO timestamps.
+- The deployed control-page assets were checked under production CSP with synthetic
+  state, US locale and a 390-pixel viewport. No control requests were sent.
+- The signed 0.2.7-r1 package preserved configuration, credentials and Scheduler
+  state during upgrade. Backend and radio binaries are unchanged; formatting is
+  confined to the interfaces and does not alter schedule execution or API data.
+
 ## 0.2.6 documentation and package verification (2026-11-08)
 
 - Audited the guides against the current UI, administrator RPC, network selection,

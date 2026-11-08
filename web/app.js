@@ -38,7 +38,16 @@ async function initialize(){
   panel.replaceChildren(title,message,retry);panel.hidden=false;
  }finally{clearTimeout(timeout);}
 }
-function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+new Date(state.at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
+function dateText(value,timeZone,withDate=true){
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return 'Unknown time';
+ const parts=new Intl.DateTimeFormat('en-GB',{calendar:'iso8601',numberingSystem:'latn',hourCycle:'h23',
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'longOffset',...(timeZone?{timeZone}:{})}).formatToParts(date);
+ const p=Object.fromEntries(parts.map(x=>[x.type,x.value])),clock=p.hour+':'+p.minute;
+ if(!withDate)return clock;
+ const offset=p.timeZoneName.replace(/^(GMT|UTC)/,'').replace(/^\+00:00$/,'')||'Z';
+ return p.year+'-'+p.month+'-'+p.day+'T'+clock+':'+p.second+offset;
+}
+function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
 const symbolPaths={
  blind:'M4 3h16v14H4z M4 6h16M4 9h16M4 12h16M4 15h16M20 3v18M18 21h4',
  clock:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 6v6l4 2',
@@ -74,7 +83,7 @@ function renderScheduler(state){
  const status=el.querySelector('.status'),next=el.querySelector('.next');el.classList.remove('error');put(status,state.running?'Running':'Stopped');status.classList.toggle('running',state.running);
  let detail=state.running?'No schedules enabled':'Manual controls remain available';
  if(state.running&&state.enabled_schedules)detail='No upcoming event in the next week';
- if(state.running&&state.next){const at=new Date(state.next.at).toLocaleString([],{weekday:'short',hour:'2-digit',minute:'2-digit',timeZone:state.timezone});detail='Next: '+state.next.target+' '+state.next.action+' · '+at;}
+ if(state.running&&state.next){const at=dateText(state.next.at,state.timezone);detail='Next: '+state.next.target+' '+state.next.action+' · '+at;}
  put(next,detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){

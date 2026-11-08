@@ -35,6 +35,13 @@ Escape dismisses it. The explanatory text is also exposed to assistive technolog
 Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
 
+Both interfaces explicitly format Gregorian dates with Latin digits and a 00–23
+hour cycle. Device last-action labels show local `HH:mm`; full timestamps use
+ISO 8601 with the relevant UTC offset. Scheduler previews retain the configured
+schedule time zone; session dates use browser-local time. Diagnostic command
+timestamps are converted for display only. Raw API/runtime timestamp fields retain
+their existing Unix-seconds or RFC3339 representations.
+
 The JSON configuration has a separate root-only `pending.json` draft. RPC `stage`
 validates and stores it; `save` activates validated settings in `config.json` and
 removes the draft; `discard` removes only the draft. The running service reads only

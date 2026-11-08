@@ -29,12 +29,14 @@ class JSONMap {
 }
 const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Value:Option,ListValue:Option,MultiValue:Option,Flag:Option,DummyValue:Option,Button:Option,SectionValue};
 (async()=>{
+ process.env.TZ='Europe/Stockholm';
  const calls=[];let respond=()=>Promise.resolve({ok:true});
- const config=JSON.parse(fs.readFileSync('files/config.json'));config.devices=[{id:'sample',name:'Blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All',devices:['sample']}];
- const data={config,account:'home',controllers:[],sunwait:true,networks:['lan','wg_test','wan','wan6']};
+ const config=JSON.parse(fs.readFileSync('files/config.json'));config.enabled=true;config.devices=[{id:'sample',name:'Blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All',devices:['sample']}];
+ const data={config,account:'home',controllers:[],sunwait:true,networks:['lan','wg_test','wan','wan6'],status:{scheduler:{running:true,enabled_schedules:1,timezone:'America/New_York',next:{target:'Blind',action:'up',at:'2026-11-08T01:00:00Z'}}}};
  const rpc={declare:spec=>(...args)=>{calls.push({method:spec.method,args});return spec.method==='get'?Promise.resolve(data):respond();}};
  const view=new Function('view','rpc','ui','form','poll','warning','E','L',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{},form,{add(){}},{gate:(_t,f)=>f()},E,{resource:x=>x});
  await view.render(data);
+ assert.equal(view.map.children.find(s=>s.type==='general').getOption('_scheduler').renderWidget().textContent,'Running · Blind · Up · 2026-11-07T20:00:00-05:00');
  const networks=view.map.children.find(s=>s.type==='advanced').getOption('networks');
  assert.equal(networks.title,'Allowed networks');assert.deepEqual(networks.keylist,['lan','wg_test']);
  assert.notEqual(networks.validate('advanced',[]),true);assert.equal(networks.validate('advanced',['lan','wg_test']),true);
@@ -60,5 +62,9 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  assert.deepEqual(JSON.parse(calls.at(-1).args[0]).networks,['lan']);
  respond=()=>Promise.resolve({error:'Synthetic save failure'});await view.handleSave();assert.match(view.saveMessage.textContent,/Synthetic save failure/);
  respond=()=>Promise.resolve({ok:true});await view.handleReset();assert.equal(calls.at(-2).method,'discard');assert.equal(view.map.data.get('json','access','session_days'),'30');
+ respond=()=>Promise.resolve({sessions:[{device:'Test browser',created:Date.parse('2026-11-08T23:00:00Z')/1000,expires:Date.parse('2026-11-09T11:00:00Z')/1000}]});
+ const updatedAccess=view.map.children.find(s=>s.type==='access');await updatedAccess.getOption('_sessions').onclick({currentTarget:{disabled:false}});
+ const table=updatedAccess.getOption('_session_list').renderWidget().textContent;
+ assert.ok(table.includes('2026-11-09T00:00:00+01:00'));assert.ok(table.includes('2026-11-09T12:00:00+01:00'));
  console.log('PASS: native-form handlers, password feedback and duplicate guard, Save/Apply/Reset, configuration conversion and credential exclusion');
 })().catch(e=>{console.error(e);process.exitCode=1;});

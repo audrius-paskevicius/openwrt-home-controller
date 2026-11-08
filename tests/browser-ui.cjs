@@ -14,6 +14,8 @@ async function connection(){
 const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','Office'].map((name,i)=>({id:'device'+i,name,state:{}})),groups:[{id:'all',name:'All blinds',devices:['device0','device1','device2','device3']}],scheduler:{running:true,enabled_schedules:1,timezone:'Europe/Stockholm',next:{target:'All blinds',action:'up',at:'2026-11-09T07:00:00Z'}}};
 (async()=>{
  const page=await connection();try{
+ await page.call('Emulation.setLocaleOverride',{locale:'en-US'});
+ await page.call('Emulation.setTimezoneOverride',{timezoneId:'Europe/Stockholm'});
  // The production page loads external assets under CSP. The isolated fixture
  // injects the same assets; live deployment checks retain the production CSP.
  await page.call('Page.setBypassCSP',{enabled:true});
@@ -24,6 +26,21 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  await page.run('initialize()');
  await page.run('document.querySelector("#warning button").click()');
  await page.run('refresh()');
+ await page.run('fixture.devices[0].state={action:"up",status:"Sent (position unknown)",at:Date.parse("2026-11-08T21:10:00Z")/1000};refresh()');
+ assert.equal(await page.run('document.querySelector("[data-id=device0] .status").textContent'),'Up sent · 22:10');
+ assert.match(await page.run('document.querySelector("#scheduler .next").textContent'),/2026-11-09T08:00:00\+01:00$/);
+ for(const [instant,zone,want] of [
+  ['2026-11-08T23:00:00Z','Europe/Stockholm','2026-11-09T00:00:00+01:00'],
+  ['2026-10-25T00:30:00Z','Europe/Stockholm','2026-10-25T02:30:00+02:00'],
+  ['2026-10-25T01:30:00Z','Europe/Stockholm','2026-10-25T02:30:00+01:00'],
+  ['2026-11-08T01:00:00Z','America/New_York','2026-11-07T20:00:00-05:00'],
+  ['2026-11-08T00:00:00Z','Asia/Kathmandu','2026-11-08T05:45:00+05:45'],
+  ['2026-11-08T00:00:00Z','UTC','2026-11-08T00:00:00Z']
+ ])assert.equal(await page.run(`dateText(${JSON.stringify(instant)},${JSON.stringify(zone)})`),want);
+ await page.call('Emulation.setLocaleOverride',{locale:'ar-EG'});
+ assert.equal(await page.run('dateText("2026-11-08T23:00:00Z",undefined,false)'),'00:00');
+ assert.equal(await page.run('dateText("2026-11-08T21:10:00Z")'),'2026-11-08T22:10:00+01:00');
+ await page.call('Emulation.setLocaleOverride',{locale:'en-US'});
  assert.deepEqual(await page.run('[...document.querySelectorAll("article h2")].map(x=>x.textContent)'),['Kitchen','Kids room','Bedroom','Office','Scheduler','All blinds']);
  assert.equal(await page.run('document.querySelectorAll("header").length'),0);
  for(const width of [320,390,1280,1920]){
@@ -54,6 +71,6 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await page.run('document.querySelector("#scheduler .status").textContent'),'Running');
  await page.run('fixture.control_order=["group:all","scheduler","device:device0"];refresh()');
  assert.deepEqual(await page.run('[...document.querySelectorAll("article h2")].slice(0,3).map(x=>x.textContent)'),['All blinds','Scheduler','Kitchen']);
- console.log('PASS: compact phone layout, 46px controls with 8px gaps, six desktop columns, configurable symbols/None, scheduler controls (synthetic API)');
+ console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');
  }finally{await page.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

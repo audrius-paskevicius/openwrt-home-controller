@@ -139,6 +139,14 @@ only through LuCI. Manual commands do not pause or disable later schedules.
 Changing the remembered-session duration affects new logins; existing sessions keep
 their original expiry unless revoked.
 
+Times use a 24-hour clock regardless of browser language. Last-sent times on device
+cards use `HH:mm` in the browser's local time zone. Dates and times elsewhere use
+ISO 8601, for example `2026-11-08T22:10:00+01:00` (`Z` means UTC), with no AM/PM or
+locale-dependent date order. Next scheduled actions use the configured schedule
+time zone in both interfaces. LuCI's signed-in-device dates and numeric command
+timestamps in diagnostics are displayed in the browser's local zone, including
+the UTC offset. These display formats do not change schedule execution times.
+
 Use your phone browser's **Add to Home Screen** command to save a shortcut. The
 control page supplies a Home Controller icon, an Android web manifest and an
 iPhone touch icon. Existing shortcuts may keep a cached image; remove and add the
