@@ -19,7 +19,7 @@ is Hasta selflearningv2 blinds (Up, Stop, Down). MQTT is reserved for a future o
 
 Users get a small mobile-friendly control page with a shared login and
 remembered sessions. Administrators manage devices, groups, accounts and schedules in
-LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
+LuCI. Access is restricted to explicitly selected LAN and VPN networks; WAN is excluded.
 
 LuCI has **General**, **Controls**, **Schedules**, **Access**, **Advanced**, and the
 full disclaimer tab. Device and schedule editors change a pending form; **Save**

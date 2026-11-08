@@ -53,10 +53,14 @@ permission is granted. Login requires JSON and is also origin checked.
 
 ## Network access
 
-Listeners bind to selected logical network addresses and detected active VPN tunnel
-addresses, never wildcard addresses. The default selected logical network is LAN.
-WireGuard, OpenVPN/OpenConnect netifd interfaces and active TUN/TAP/XFRM interfaces are
-detected. Other routed VPNs can be selected by their logical network name in LuCI.
+Listeners bind only to addresses of explicitly selected, active logical networks,
+never wildcard addresses. The default selected logical network is LAN. VPNs,
+including WireGuard, OpenVPN and OpenConnect, must be selected in LuCI's **Allowed
+networks** selector. Protocol and TUN/TAP/XFRM device names never grant access by
+themselves. Tunnels outside netifd must be attached to a logical OpenWrt interface
+before they can be selected. The same selections supply the ingress firewall's
+allowed devices, so an unchecked VPN cannot reach the service through its LAN address.
+Network aliases sharing one underlying device share its ingress permission.
 Devices assigned to the logical networks named `wan` and `wan6` are explicitly
 excluded. This depends on those network names; it is not a classification of every
 possible custom topology. IPv4 and non-link-local IPv6 are supported.

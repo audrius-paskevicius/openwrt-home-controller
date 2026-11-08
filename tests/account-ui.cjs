@@ -31,10 +31,13 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
 (async()=>{
  const calls=[];let respond=()=>Promise.resolve({ok:true});
  const config=JSON.parse(fs.readFileSync('files/config.json'));config.devices=[{id:'sample',name:'Blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All',devices:['sample']}];
- const data={config,account:'home',controllers:[],sunwait:true};
+ const data={config,account:'home',controllers:[],sunwait:true,networks:['lan','wg_test','wan','wan6']};
  const rpc={declare:spec=>(...args)=>{calls.push({method:spec.method,args});return spec.method==='get'?Promise.resolve(data):respond();}};
  const view=new Function('view','rpc','ui','form','poll','warning','E',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{},form,{add(){}},{gate:(_t,f)=>f()},E);
  await view.render(data);
+ const networks=view.map.children.find(s=>s.type==='advanced').getOption('networks');
+ assert.equal(networks.title,'Allowed networks');assert.deepEqual(networks.keylist,['lan','wg_test']);
+ assert.notEqual(networks.validate('advanced',[]),true);assert.equal(networks.validate('advanced',['lan','wg_test']),true);
  const access=view.map.children.find(s=>s.type==='access'),pass=access.getOption('_password'),button=access.getOption('_password_action');
  const message=button.renderWidget().children[1],event={currentTarget:{disabled:true}}; // LuCI disables before invoking onclick.
  await button.onclick(event);assert.match(message.textContent,/Enter a new password/);assert.equal(calls.length,0);
@@ -50,6 +53,11 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  let saved=JSON.parse(calls.at(-1).args[0]);assert.equal(saved.session_days,7);assert.deepEqual(saved.control_order,['device:sample','scheduler','group:all']);assert.equal(saved.groups[0].devices[0],'sample');assert.equal(saved.devices[0].unit,0);
  assert.ok(!JSON.stringify(saved).includes('_password'));assert.ok(!JSON.stringify(saved).includes('short'));
  await view.handleSaveApply();assert.equal(calls.at(-1).method,'save');
+ // A VPN checkbox must survive Save & Apply, and an explicit deselection must too.
+ view.map.data.set('json','advanced','networks',['wg_test']);await view.handleSaveApply();
+ assert.deepEqual(JSON.parse(calls.at(-1).args[0]).networks,['wg_test']);
+ view.map.data.set('json','advanced','networks',['lan']);await view.handleSaveApply();
+ assert.deepEqual(JSON.parse(calls.at(-1).args[0]).networks,['lan']);
  respond=()=>Promise.resolve({error:'Synthetic save failure'});await view.handleSave();assert.match(view.saveMessage.textContent,/Synthetic save failure/);
  respond=()=>Promise.resolve({ok:true});await view.handleReset();assert.equal(calls.at(-2).method,'discard');assert.equal(view.map.data.get('json','access','session_days'),'30');
  console.log('PASS: native-form handlers, password feedback and duplicate guard, Save/Apply/Reset, configuration conversion and credential exclusion');

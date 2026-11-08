@@ -134,7 +134,9 @@ return view.extend({
   });
   dummy(access,'_session_list','',()=>sessionList);command(access,'_revoke','Sessions','Sign out all devices',async()=>{result(await revoke());sessionList.replaceChildren();return 'All sessions have been signed out.';});
   const advanced=m.section(form.NamedSection,'advanced','advanced','Advanced');advanced.hidetitle=true;
-  value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))');choice(advanced,form.MultiValue,'networks','LAN networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].map(n=>[n,n])),'VPN tunnels are detected automatically. WAN is excluded. Existing firewall restrictions still apply.');
+  value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))');
+  o=choice(advanced,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
+  o.validate=(_sid,v)=>list(v).length?true:'Select at least one LAN or VPN network.';
   command(advanced,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},null,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');

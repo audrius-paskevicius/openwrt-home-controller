@@ -4,6 +4,20 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.4 network selection fix (2026-11-08)
+
+- All 22 Go tests passed on the target ARM router, including regression cases for
+  selected and unselected VPNs, LAN exclusion, offline interfaces, IPv6-only
+  addresses, WAN/WAN6 rejection and aliases of WAN devices.
+- Native LuCI **Allowed networks** was exercised on the router: selecting a VPN
+  added its HTTPS listener and ingress firewall permission; deselecting it removed
+  both. The original LAN-only selection was restored and persisted across reload.
+- JavaScript syntax and form-handler tests passed, including saving and removing
+  a selected VPN, empty-selection validation and WAN option exclusion.
+- The signed package upgraded from 0.2.3-r1 to 0.2.4-r1. Configuration, credentials
+  and saved Scheduler state matched their pre-upgrade checksums. The Scheduler
+  remained stopped during live network tests; no device commands were sent.
+
 ## 0.2.3
 
 Version 0.2.3 adds a permanent disclaimer tab matching Wi-Fi Coordinator's warning

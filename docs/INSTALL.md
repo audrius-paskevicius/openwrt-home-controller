@@ -18,7 +18,9 @@ driver/helper binaries on another architecture.
    the service disabled, no devices or schedules, and no stored login credentials.
 4. Connect a TellStick and add devices and optional groups in **Controls**.
    Internal IDs are generated automatically. TellStick selection is automatic.
-   LAN and detected VPN tunnels are selected by default; overrides are in **Advanced**.
+   Under **Advanced → Allowed networks**, select the LAN and VPN networks that may
+   access the control page. Fresh installations select LAN only. VPNs must be selected
+   explicitly; leaving a VPN unchecked excludes it. WAN cannot be selected.
 5. Under **Schedules**, set coordinates for solar events.
    Keep **Follow router** to follow OpenWrt's
    time-zone setting. Ensure the router's date/time and NTP setup are correct.
@@ -39,6 +41,13 @@ through their own buttons. Their results appear beside those buttons.
 Applying settings or changing the shared login restarts Home Controller. Remembered
 sessions survive ordinary restarts; password changes and **Sign out all devices**
 invalidate them. The scheduler's saved Running/Stopped preference is retained.
+
+When upgrading from 0.2.3 or earlier, the saved network selections now determine
+access immediately: VPN tunnels are no longer added automatically. Select and apply
+any VPN you want to keep using before upgrading, or upgrade from LAN. At least one selected
+network must have an active address. VPN tunnel devices created outside OpenWrt's
+network configuration must first be attached to a logical interface under
+**Network → Interfaces**, then selected in **Allowed networks**.
 
 Both interfaces show the project disclaimer before first use. Acknowledgement is
 remembered in that browser for the exact text. Changed wording asks again; blocked

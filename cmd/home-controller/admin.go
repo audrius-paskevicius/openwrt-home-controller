@@ -254,8 +254,20 @@ func networkAccess(c Config) ([]string, []string, error) {
 	if e = json.Unmarshal(out, &data); e != nil {
 		return nil, nil, e
 	}
+	return networkAccessForInterfaces(c, data.Interface, func(name string) ([]net.Addr, error) {
+		i, err := net.InterfaceByName(name)
+		if err != nil {
+			return nil, err
+		}
+		return i.Addrs()
+	})
+}
+
+// Only explicit logical network selections may supply listeners or ingress devices.
+// The address lookup also covers IPv6 prefix assignments omitted by netifd.
+func networkAccessForInterfaces(c Config, interfaces []iface, addresses func(string) ([]net.Addr, error)) ([]string, []string, error) {
 	denied := map[string]bool{}
-	for _, i := range data.Interface {
+	for _, i := range interfaces {
 		if i.Interface == "wan" || i.Interface == "wan6" {
 			denied[i.Device] = true
 		}
@@ -264,14 +276,16 @@ func networkAccess(c Config) ([]string, []string, error) {
 	binds := []string{}
 	want := map[string]bool{}
 	for _, n := range c.Networks {
+		if n == "wan" || n == "wan6" {
+			return nil, nil, errors.New("WAN access is not allowed")
+		}
 		want[n] = true
 	}
-	for _, i := range data.Interface {
-		vpn := i.Proto == "wireguard" || i.Proto == "openvpn" || i.Proto == "openconnect" || strings.HasPrefix(i.Device, "tun") || strings.HasPrefix(i.Device, "tap") || strings.HasPrefix(i.Device, "xfrm")
-		if !i.Up || (!want[i.Interface] && !vpn) {
+	for _, i := range interfaces {
+		if !i.Up || !want[i.Interface] {
 			continue
 		}
-		if denied[i.Device] || !regexpDevice(i.Device) {
+		if denied[i.Device] || i.Device == "lo" || !regexpDevice(i.Device) {
 			return nil, nil, errors.New("selected network uses WAN or invalid interface")
 		}
 		devices = append(devices, i.Device)
@@ -286,40 +300,25 @@ func networkAccess(c Config) ([]string, []string, error) {
 			}
 		}
 	}
-	// OpenVPN can create tun/tap interfaces outside netifd. Include active ones.
-	links, _ := net.Interfaces()
-	for _, i := range links {
-		if i.Flags&net.FlagUp != 0 && !denied[i.Name] && (exists("/sys/class/net/"+i.Name+"/tun_flags") || strings.HasPrefix(i.Name, "tun") || strings.HasPrefix(i.Name, "tap") || strings.HasPrefix(i.Name, "xfrm")) && regexpDevice(i.Name) {
-			devices = append(devices, i.Name)
-			addresses, _ := i.Addrs()
-			for _, a := range addresses {
-				ip, _, e := net.ParseCIDR(a.String())
-				if e == nil && !ip.IsLinkLocalUnicast() {
-					binds = append(binds, net.JoinHostPort(ip.String(), strconv.Itoa(c.Port)))
-				}
-			}
-		}
-	}
-	if len(binds) == 0 {
-		return nil, nil, errors.New("no permitted LAN/VPN address is active")
-	}
 	// Include IPv6 prefix-assigned LAN addresses, which netifd does not list
 	// in ipv6-address. Never bind a device not already admitted above.
 	for _, name := range devices {
 		if name == "lo" {
 			continue
 		}
-		i, e := net.InterfaceByName(name)
+		addrs, e := addresses(name)
 		if e != nil {
 			continue
 		}
-		addresses, _ := i.Addrs()
-		for _, a := range addresses {
+		for _, a := range addrs {
 			ip, _, e := net.ParseCIDR(a.String())
 			if e == nil && !ip.IsLinkLocalUnicast() {
 				binds = append(binds, net.JoinHostPort(ip.String(), strconv.Itoa(c.Port)))
 			}
 		}
+	}
+	if len(binds) == 0 {
+		return nil, nil, errors.New("no selected LAN/VPN network has an active address")
 	}
 	unique := func(items []string) []string {
 		out := []string{}
