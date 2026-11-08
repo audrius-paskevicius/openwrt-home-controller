@@ -16,6 +16,16 @@ control commands. Shared-login handler tests check short passwords, failures,
 duplicate submissions and feedback, and ensure credentials never enter saved
 configuration. These synthetic tests do not transmit radio commands.
 
+All 21 backend tests also passed on the target router. After the signed APK upgrade,
+live LuCI checks confirmed the warning gate, six combined controls, visible schedule
+settings, password feedback, a saved draft surviving page reload, and Reset removing
+that draft. Configuration, credential and scheduler-preference files retained their
+pre-upgrade SHA256 hashes; Scheduler remained stopped. The HTTPS control page was
+checked under its production CSP for acknowledgement, login/logout, a 390-pixel
+layout, its manifest and the new 180/192/512-pixel house icons. No radio commands
+were sent. Existing phone shortcuts may need to be re-added to refresh cached icons;
+physical phone shortcut installation is not covered by these browser tests.
+
 Version 0.2.1 replaces custom LuCI styling with native tabs, widgets and table/form
 markup. Browser checks cover the compact control layout, unchanged 46-pixel
 buttons with 8-pixel gaps, configurable symbols (including None), and responsive
