@@ -39,8 +39,13 @@ private configuration, never public examples or release defaults.
 
 ## Daily use
 
-The household page shows individual devices first, then groups, then Scheduler.
+The household page shows individual devices first, then Scheduler, then groups.
 Up/Stop/Down buttons are stacked vertically with a small status line for each control.
+Phones use two columns. Wider screens add columns according to the available width.
+Choose a **Symbol** in each device/group editor: Blind, Clock, Lamp, Plug, Fan or None.
+Set the Scheduler symbol under **Household access → Household display**. Existing
+devices/groups default to Blind, and Scheduler defaults to Clock. Symbols only
+change appearance; choosing Lamp does not change a blind's available commands.
 The small Sign out link is at the bottom. A remembered login
 lasts for the administrator-selected number of days. Sign out ends that session;
 LuCI can revoke all sessions or change the household account. Management is available

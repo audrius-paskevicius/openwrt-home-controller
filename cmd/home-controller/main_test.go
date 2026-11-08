@@ -15,7 +15,7 @@ import (
 )
 
 func exampleConfig() Config {
-	return Config{Enabled: true, Port: 8443, Networks: []string{"lan"}, Timezone: "Europe/Stockholm", SessionDays: 30, Devices: []Device{{"blind", "Example blind", 1, 1234, 0}}, Groups: []Group{{"all", "All", []string{"blind"}}}}
+	return Config{Enabled: true, Port: 8443, Networks: []string{"lan"}, Timezone: "Europe/Stockholm", SessionDays: 30, Devices: []Device{{"blind", "Example blind", 1, 1234, 0, ""}}, Groups: []Group{{"all", "All", []string{"blind"}, ""}}}
 }
 func TestAutomaticControllerSelection(t *testing.T) {
 	a := map[string]string{"serial": "TEST_A"}

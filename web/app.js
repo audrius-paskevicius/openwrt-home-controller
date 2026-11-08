@@ -12,18 +12,29 @@ async function api(path,body){
 }
 function showLogin(){revision++;signedIn=false;csrf='';signature='';$('login').hidden=false;$('controls').hidden=true;$('logout').hidden=true;}
 function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+new Date(state.at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
+const symbolPaths={
+ blind:'M4 3h16v14H4z M4 6h16M4 9h16M4 12h16M4 15h16M20 3v18M18 21h4',
+ clock:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 6v6l4 2',
+ lamp:'M8 20h8M9 23h6M8 16c0-3-3-4-3-8a7 7 0 0 1 14 0c0 4-3 5-3 8z',
+ plug:'M8 2v6M16 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
+ fan:'M12 10c-5-1-6-8-1-8 4 0 5 5 2 8M14 12c3-4 10-2 7 3-2 4-7 2-8-1M11 14c2 5-4 9-6 5-2-4 2-7 5-7M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4'
+};
+function heading(name,symbol,fallback){
+ const row=document.createElement('div');row.className='card-heading';const title=document.createElement('h2');title.textContent=name;row.append(title);
+ const kind=symbol||fallback;if(symbolPaths[kind]){const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');svg.classList.add('symbol');svg.dataset.symbol=kind;path.setAttribute('d',symbolPaths[kind]);svg.append(path);row.append(svg);}return row;
+}
 function card(item,group){
  const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;
- const title=document.createElement('h2');title.textContent=item.name;
+ const title=heading(item.name,item.icon,'blind');
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent='Position unknown';
  const buttons=document.createElement('div');buttons.className='buttons';
  for(const action of ['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);
   button.onclick=async()=>{revision++;el.classList.remove('error');put(status,'Sending '+labels[action].toLowerCase()+'…');try{await api('command',{target:item.id,action});put(status,labels[action]+' queued');put($('message'),'');setTimeout(refresh,700);}catch(e){el.classList.add('error');put(status,e.message);}};buttons.append(button);}
  el.append(title,status,buttons);return el;
 }
-function schedulerCard(){
+function schedulerCard(symbol){
  const el=document.createElement('article');el.className='card scheduler';el.id='scheduler';
- const title=document.createElement('h2');title.textContent='Scheduler';
+ const title=heading('Scheduler',symbol,'clock');
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
  const next=document.createElement('p');next.className='next';
  const buttons=document.createElement('div');buttons.className='buttons';
@@ -41,8 +52,8 @@ function renderScheduler(state){
 }
 async function refresh(){
  if(refreshing)return;refreshing=true;const before=revision;
- try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name]),groups]);
-  if(key!==signature){$('controls').replaceChildren(...data.devices.map(d=>card(d,false)),...groups.map(g=>card(g,true)),schedulerCard());signature=key;}
+ try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon]),groups,data.scheduler_icon]);
+  if(key!==signature){$('controls').replaceChildren(...data.devices.map(d=>card(d,false)),schedulerCard(data.scheduler_icon),...groups.map(g=>card(g,true)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
   for(const d of data.devices){const el=[...$('controls').children].find(x=>x.dataset.id===d.id);if(!el)continue;put(el.querySelector('.status'),statusText(d.state));el.classList.toggle('error',!!d.state.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(d.state.status));}
   for(const g of groups){const el=[...$('controls').children].find(x=>x.dataset.id===g.id),states=data.devices.filter(d=>g.devices.includes(d.id)).map(d=>d.state);let text='Positions unknown';const failed=states.find(s=>s.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(s.status));if(failed)text='Some commands failed';else if(states.some(s=>s.status==='Queued'))text='Commands queued';else if(states.length&&states.every(s=>s.status==='Sent (position unknown)'&&s.action===states[0].action))text=labels[states[0].action]+' sent to all';else if(states.some(s=>s.status))text='See individual results';put(el.querySelector('.status'),text);el.classList.toggle('error',!!failed);}

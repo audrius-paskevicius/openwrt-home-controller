@@ -13,6 +13,7 @@ class Element {
  replaceChildren(...children) { this.children = children; }
  setAttribute(key, value) { this.attrs[key] = value; }
  get firstChild() { return this.children[0]; }
+ querySelector(selector) { const tag=selector.split('[')[0];return descendants(this).find(e=>e!==this&&e.tag===tag); }
  get textContent() { return this.children.map(c => typeof c === 'string' ? c : c.textContent).join(''); }
  set textContent(text) { this.children = [text]; }
  addEventListener(name, handler) { this.events[name] = handler; }
@@ -25,8 +26,13 @@ function descendants(e) { return [e, ...e.children.filter(c => c instanceof Elem
  const calls = [];
  let respond = () => Promise.resolve({ok:true});
  const rpc = {declare: spec => (...args) => { calls.push({method:spec.method,args}); return respond(); }};
+ const ui={addNotification:()=>assert.fail('Account feedback must be inline'),tabs:{initTabGroup:()=>{}},
+  Textfield:class {constructor(value,options){this.value=value;this.options=options;}render(){return new Element('div',{},[new Element('input',{type:this.options.password?'password':'text',value:this.value})]);}},
+  Select:class {constructor(value){this.value=value;}render(){return new Element('div',{},[new Element('select',{value:this.value})]);}},
+  Checkbox:class {constructor(value){this.value=value;}render(){const input=new Element('input',{type:'checkbox'});input.checked=this.value==='1';return new Element('div',{},[input,new Element('label')]);}}
+ };
  const view = new Function('view', 'rpc', 'ui', 'E', 'poll', fs.readFileSync('luci/home-controller.js','utf8'))(
-  {extend:x=>x}, rpc, {addNotification:()=>assert.fail('Account feedback must be inline')},
+  {extend:x=>x}, rpc, ui,
   (tag, attrs, children) => new Element(tag, attrs, children), {add:()=>{}});
  const root = view.render({config:JSON.parse(fs.readFileSync('files/config.json')), account:'household', controllers:[]});
  const account = descendants(root).find(e=>e.tag==='div' && e.children[0]?.textContent==='Household account');

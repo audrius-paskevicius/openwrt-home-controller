@@ -21,7 +21,6 @@ printf '<!doctype html><meta http-equiv="refresh" content="0;url=/api/page"><tit
 cp DISCLAIMER.txt "$ROOT/usr/share/home-controller/www/disclaimer.txt"
 for op in login logout state command page scheduler; do printf '#!/bin/sh\nexec /usr/bin/home-controller\n' > "$ROOT/usr/share/home-controller/www/api/$op"; done
 cp luci/home-controller.js "$ROOT/www/luci-static/resources/view/"
-cp luci/home-controller.css "$ROOT/www/luci-static/resources/"
 cp files/menu.json "$ROOT/usr/share/luci/menu.d/luci-app-home-controller.json"
 cp files/acl.json "$ROOT/usr/share/rpcd/acl.d/luci-app-home-controller.json"
 printf '/etc/home-controller/\n/etc/tellstick.conf\n' > "$ROOT/lib/upgrade/keep.d/home-controller"

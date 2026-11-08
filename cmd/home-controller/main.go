@@ -42,11 +42,13 @@ type Device struct {
 	RadioID int    `json:"radio_id"`
 	House   int    `json:"house"`
 	Unit    int    `json:"unit"`
+	Icon    string `json:"icon,omitempty"`
 }
 type Group struct {
 	ID      string   `json:"id"`
 	Name    string   `json:"name"`
 	Devices []string `json:"devices"`
+	Icon    string   `json:"icon,omitempty"`
 }
 type Schedule struct {
 	ID       string `json:"id"`
@@ -62,17 +64,18 @@ type Schedule struct {
 	Fallback string `json:"fallback"`
 }
 type Config struct {
-	Enabled     bool       `json:"enabled"`
-	Port        int        `json:"port"`
-	Networks    []string   `json:"networks"`
-	Timezone    string     `json:"timezone"`
-	Latitude    float64    `json:"latitude"`
-	Longitude   float64    `json:"longitude"`
-	Controller  string     `json:"controller,omitempty"` // Accepted only to migrate older configuration.
-	SessionDays int        `json:"session_days"`
-	Devices     []Device   `json:"devices"`
-	Groups      []Group    `json:"groups"`
-	Schedules   []Schedule `json:"schedules"`
+	Enabled       bool       `json:"enabled"`
+	Port          int        `json:"port"`
+	Networks      []string   `json:"networks"`
+	Timezone      string     `json:"timezone"`
+	Latitude      float64    `json:"latitude"`
+	Longitude     float64    `json:"longitude"`
+	Controller    string     `json:"controller,omitempty"` // Accepted only to migrate older configuration.
+	SessionDays   int        `json:"session_days"`
+	Devices       []Device   `json:"devices"`
+	Groups        []Group    `json:"groups"`
+	Schedules     []Schedule `json:"schedules"`
+	SchedulerIcon string     `json:"scheduler_icon,omitempty"`
 }
 type Credential struct {
 	User     string `json:"user"`
@@ -206,6 +209,9 @@ func validTime(s string, optional bool) bool {
 	return e == nil && len(s) == 5
 }
 func validate(c Config) error {
+	if !validIcon(c.SchedulerIcon) {
+		return errors.New("invalid scheduler symbol")
+	}
 	if c.Port < 1024 || c.Port > 65535 || c.SessionDays < 1 || c.SessionDays > 90 {
 		return errors.New("port must be 1024..65535; session days 1..90")
 	}
@@ -229,6 +235,9 @@ func validate(c Config) error {
 	ids := map[string]bool{}
 	radios := map[int]bool{}
 	for _, d := range c.Devices {
+		if !validIcon(d.Icon) {
+			return errors.New("invalid device symbol")
+		}
 		if !idRE.MatchString(d.ID) || ids[d.ID] || len(d.Name) < 1 || len(d.Name) > 80 || d.RadioID < 1 || d.RadioID > 65535 || radios[d.RadioID] || d.House < 1 || d.House > 65535 || d.Unit < 0 || d.Unit > 15 {
 			return errors.New("invalid or duplicate device")
 		}
@@ -236,6 +245,9 @@ func validate(c Config) error {
 		radios[d.RadioID] = true
 	}
 	for _, g := range c.Groups {
+		if !validIcon(g.Icon) {
+			return errors.New("invalid group symbol")
+		}
 		if !idRE.MatchString(g.ID) || ids[g.ID] || len(g.Name) < 1 || len(g.Name) > 80 || len(g.Devices) == 0 || len(g.Devices) > 64 {
 			return errors.New("invalid group")
 		}
@@ -441,9 +453,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		devices := []map[string]any{}
 		for _, d := range s.config.Devices {
-			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "state": s.states[d.ID]})
+			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "state": s.states[d.ID]})
 		}
-		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now())})
+		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon})
 	case "/api/scheduler":
 		if r.Method != "POST" {
 			fail(w, 405, "POST required")

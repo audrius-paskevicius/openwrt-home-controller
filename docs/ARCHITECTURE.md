@@ -14,6 +14,10 @@ The patched Telldus daemon performs USB communication.
 The LuCI page calls an administrator-only rpcd plugin. It validates configuration
 before applying it. Household access never grants a router session or exposes
 configuration, command execution, arbitrary file access, or radio addresses.
+LuCI uses its native tab manager and input widgets, with standard theme classes
+for sections, forms and tables; no Home Controller administration stylesheet is
+loaded. Household symbols are fixed SVG paths selected by a validated name,
+never user-supplied SVG or external image URLs.
 
 ## Authentication
 

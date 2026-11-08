@@ -1,5 +1,11 @@
 # Release verification
 
+Version 0.2.1 replaces custom LuCI styling with native tabs, widgets and table/form
+markup. Browser checks cover the compact household layout, unchanged 46-pixel
+buttons with 8-pixel gaps, configurable symbols (including None), and responsive
+desktop columns. The symbol schema tests validate accepted choices, reject unknown
+markup/URLs, and check configuration round trips and household API output.
+
 Version 0.2.0 redesigns both interfaces and adds household scheduler control.
 Automated tests cover persistent Stop/Start, cancellation of waiting scheduled
 commands while retaining manual commands, no missed-event replay, next weekly

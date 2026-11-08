@@ -14,6 +14,8 @@ LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
 - Manual commands leave future schedules active; missed events are skipped.
 - Household Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
 - Tabbed LuCI administration with device/group editors and guided schedule controls.
+- Standard LuCI widgets and theme styling; configurable household symbols.
+- Compact two-column phone controls and a desktop grid that uses the available width.
 - Unprivileged household services, independent HTTPS key, and no cloud dependency.
 - Patched Telldus driver preserving Hasta selflearningv2 unit-zero support.
 
