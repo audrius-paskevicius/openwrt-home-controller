@@ -5,6 +5,15 @@ markup. Browser checks cover the compact household layout, unchanged 46-pixel
 buttons with 8-pixel gaps, configurable symbols (including None), and responsive
 desktop columns. The symbol schema tests validate accepted choices, reject unknown
 markup/URLs, and check configuration round trips and household API output.
+All 19 backend tests passed on the target router. Live native LuCI checks covered
+tabs, widgets, tables, schedule fields and inline password validation. Saving None
+through LuCI removed a household symbol; the original setting was then restored.
+Configuration and the user's scheduler preference matched their pre-test files
+exactly. No blind commands were sent. At 390 pixels, the same four room names and
+stopped scheduler measured about 75 pixels shorter than 0.2.0 without smaller buttons.
+Shortcut assets include a manifest, scalable source, and 180/192/512-pixel PNGs;
+browser delivery is checked, but installation on physical iOS/Android devices is
+not part of the automated tests.
 
 Version 0.2.0 redesigns both interfaces and adds household scheduler control.
 Automated tests cover persistent Stop/Start, cancellation of waiting scheduled

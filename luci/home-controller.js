@@ -23,7 +23,7 @@ function field(label,value,type){const widget=new ui.Textfield(value==null?'':St
 function select(label,value,choices){const widget=new ui.Select(String(value),Object.fromEntries(choices),{sort:choices.map(x=>String(x[0]))}).render(),input=widget.querySelector('select');return valueRow(label,widget,input);}
 function check(label,value){const node=new ui.Checkbox(value?'1':'0',{}).render(),input=node.querySelector('input[type=checkbox]');node.querySelector('label').append(' '+label);return {input,node};}
 function section(title){return E('div',{class:'cbi-section'},[E('h3',{},title)]);}
-function spaced(nodes){return nodes.flatMap((node,i)=>i?[' ',node]:[node]);}
+function spaced(nodes,gap=' '){return nodes.flatMap((node,i)=>i?[gap,node]:[node]);}
 function hide(node,hidden){node.hidden=hidden;node.classList.toggle('hidden',hidden);}
 function integer(f,min,max){const n=Number(f.input.value);if(f.input.value===''||!Number.isInteger(n)||n<min||n>max)throw Error(f.node.firstChild.textContent+': enter a number from '+min+' to '+max+'.');return n;}
 return view.extend({
@@ -91,7 +91,7 @@ return view.extend({
    offset.input.min=-720;offset.input.max=720;
    const solar=E('div',{},[offset.node,E('details',{},[E('summary',{},'Time limits and fallback'),earliest.node,latest.node,fallback.node]),E('p',{class:'cbi-section-descr'},data.sunwait?'Solar times use the configured location below.':'Install the sunwait package before enabling a solar schedule.')]);
    const change=()=>{hide(time.node,event.input.value!=='time');hide(solar,event.input.value==='time');};event.input.addEventListener('change',change);change();
-   modal(existing?'Edit schedule':'Add schedule',[enabled.node,E('div',{},[target.node,action.node]),E('p',{},'Repeat on'),E('div',{class:'cbi-value-field'},spaced(days.map(x=>x.node))),event.node,time.node,solar],()=>{
+   modal(existing?'Edit schedule':'Add schedule',[enabled.node,E('div',{},[target.node,action.node]),E('p',{},'Repeat on'),E('div',{class:'cbi-value-field'},spaced(days.map(x=>x.node),'\u00a0\u00a0')),event.node,time.node,solar],()=>{
     const chosen=days.filter(x=>x.input.checked).map(x=>x.id);if(!target.input.value)throw Error('Add a device or group first.');if(!chosen.length)throw Error('Choose at least one weekday.');
     const isSolar=event.input.value!=='time';if(!isSolar&&!time.input.value)throw Error('Choose a time.');if(isSolar&&enabled.input.checked&&!data.sunwait)throw Error('Install sunwait before enabling this solar schedule.');if(earliest.input.value&&latest.input.value&&earliest.input.value>latest.input.value)throw Error('The earliest time must not be after the latest time.');
     return Object.assign({},s,{enabled:enabled.input.checked,target:target.input.value,action:action.input.value,days:chosen,event:event.input.value,time:isSolar?'':time.input.value,offset:isSolar?integer(offset,-720,720):0,earliest:isSolar?earliest.input.value:'',latest:isSolar?latest.input.value:'',fallback:isSolar?fallback.input.value:''});

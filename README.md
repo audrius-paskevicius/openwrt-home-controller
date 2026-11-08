@@ -16,6 +16,7 @@ LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
 - Tabbed LuCI administration with device/group editors and guided schedule controls.
 - Standard LuCI widgets and theme styling; configurable household symbols.
 - Compact two-column phone controls and a desktop grid that uses the available width.
+- Home-screen shortcut icons for Android and iPhone.
 - Unprivileged household services, independent HTTPS key, and no cloud dependency.
 - Patched Telldus driver preserving Hasta selflearningv2 unit-zero support.
 

@@ -51,6 +51,12 @@ lasts for the administrator-selected number of days. Sign out ends that session;
 LuCI can revoke all sessions or change the household account. Management is available
 only through LuCI. Manual commands do not pause or disable later schedules.
 
+Use your phone browser's **Add to Home Screen** command to save a shortcut. The
+household page supplies a Home Controller icon, an Android web manifest and an
+iPhone touch icon. Existing shortcuts may keep a cached image; remove and add the
+shortcut again to pick up the new icon. This remains a local online control page,
+not an offline controller.
+
 The Scheduler card shows Running/Stopped and the next event in the configured router
 or custom time zone. **Stop** cancels waiting scheduled commands and prevents future
 scheduled sends, while manual controls remain available. It does **not** stop moving
