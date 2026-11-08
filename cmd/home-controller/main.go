@@ -669,11 +669,9 @@ func serve() error {
 		return e
 	}
 	if c.Timezone == "router" {
-		b, e := exec.Command("/sbin/uci", "-q", "get", "system.@system[0].zonename").Output()
-		if e != nil {
+		if e := readJSON(run+"/timezone.json", &c.Timezone); e != nil {
 			return errors.New("router time zone unavailable")
 		}
-		c.Timezone = strings.TrimSpace(string(b))
 		if _, e = time.LoadLocation(c.Timezone); e != nil {
 			return e
 		}

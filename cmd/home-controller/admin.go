@@ -313,6 +313,20 @@ func configure() error {
 		os.MkdirAll(dir, 0700)
 		own(dir)
 	}
+	if c.Timezone == "router" {
+		b, err := exec.Command("/sbin/uci", "-q", "get", "system.@system[0].zonename").Output()
+		if err != nil {
+			return errors.New("router time zone unavailable")
+		}
+		zone := strings.TrimSpace(string(b))
+		if _, err = time.LoadLocation(zone); err != nil {
+			return err
+		}
+		if err = atomicJSON(run+"/timezone.json", zone); err != nil {
+			return err
+		}
+		own(run + "/timezone.json")
+	}
 	for _, p := range []string{"config.json", "credential.json"} {
 		adminFile(base + "/" + p)
 	}

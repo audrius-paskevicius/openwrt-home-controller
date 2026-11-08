@@ -30,6 +30,11 @@ async function refresh() {
   if (!signedIn) { $('devices').replaceChildren(...data.devices.map(card)); $('groups').replaceChildren(...(data.groups || []).map(card)); }
   signedIn = true; $('login').hidden = true; $('controls').hidden = false; $('logout').hidden = false;
   for (const d of data.devices) { const el = [...$('devices').children].find(x=>x.dataset.id===d.id); if(el) el.querySelector('.status').textContent = d.state.status ? d.state.action.toUpperCase() + ' · ' + d.state.status : 'Position unknown'; }
+  for (const g of data.groups || []) {
+   const el = [...$('groups').children].find(x=>x.dataset.id===g.id);
+   const states = data.devices.filter(d=>g.devices.includes(d.id)).map(d=>d.state);
+   if(el) el.querySelector('.status').textContent = states.length && states.every(s=>s.status==='Sent (position unknown)' && s.action===states[0].action) ? states[0].action.toUpperCase()+' · Sent to all (positions unknown)' : states.some(s=>s.status) ? 'See individual results' : 'Positions unknown';
+  }
  } catch(e) { if(signedIn) message('Connection interrupted. ' + e.message); }
  finally { refreshing=false; }
 }
