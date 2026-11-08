@@ -31,6 +31,29 @@ function choice(section,type,name,title,values,description){
 }
 function value(section,name,title,datatype,description){const o=section.option(form.Value,name,title,description);o.rmempty=false;if(datatype)o.datatype=datatype;return o;}
 function dummy(section,name,title,render){const o=section.option(form.DummyValue,name,title);o.renderWidget=()=>E('div',{},render());return o;}
+function webServerHelp(description){
+ const text='Home Controller uses a separate uHTTPd instance, started and stopped with this service. This port serves the control page only. LuCI uses the router’s main uHTTPd instance, configured separately under Services → uHTTPd.';
+ let pinned=false,dismissed=false;
+ const target=E('span',{class:'hc-setting-help',role:'button',tabindex:'0','data-tooltip':text,
+  'data-tooltip-style':'hc-help-tooltip','aria-label':text},description.textContent);
+ const show=()=>{
+  dismissed=false;
+  ui.showTooltip({target});
+  const tip=document.querySelector('body > .cbi-tooltip');
+  if(tip){const r=tip.getBoundingClientRect();tip.style.left=window.scrollX+Math.max(8,Math.min(r.left,window.innerWidth-r.width-8))+'px';}
+ };
+ const hide=()=>{pinned=false;dismissed=true;ui.hideTooltip({target});};
+ const toggle=()=>{const wasPinned=pinned;target.focus();if(wasPinned)hide();else{pinned=true;show();}};
+ description.replaceChildren(target);
+ description.addEventListener('mouseover',show);
+ description.addEventListener('mouseout',()=>{if(!dismissed&&document.activeElement===target)show();});
+ description.addEventListener('click',ev=>{ev.preventDefault();toggle();});
+ target.addEventListener('focus',show);target.addEventListener('blur',hide);
+ target.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();hide();}
+  else if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggle();}
+ });
+}
 function command(section,name,title,caption,handler){
  const message=feedback(),o=section.option(form.Button,name,title);let busy=false;o.inputtitle=caption;o.inputstyle='action';
  o.renderWidget=function(...args){return E('div',{},[form.Button.prototype.renderWidget.apply(this,args),message]);};
@@ -134,14 +157,15 @@ return view.extend({
   });
   dummy(access,'_session_list','',()=>sessionList);command(access,'_revoke','Sessions','Sign out all devices',async()=>{result(await revoke());sessionList.replaceChildren();return 'All sessions have been signed out.';});
   const advanced=m.section(form.NamedSection,'advanced','advanced','Advanced');advanced.hidetitle=true;
-  value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))');
+  o=value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))','Separate web server for the control page.');
+  o.renderFrame=function(...args){const node=form.Value.prototype.renderFrame.apply(this,args);const description=node.querySelector('.cbi-value-description');if(description)webServerHelp(description);return node;};
   o=choice(advanced,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
   o.validate=(_sid,v)=>list(v).length?true:'Select at least one LAN or VPN network.';
   command(advanced,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},null,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');
   disclaimer.render=()=>E('div',{'class':'cbi-section','data-tab':'disclaimer','data-tab-title':disclaimer.title},warning.page(this.disclaimer));
-  const node=await m.render();
+  const node=await m.render();node.append(E('link',{rel:'stylesheet',href:L.resource('home-controller-help.css')+'?v=025'}));
   this.disclaimerActive=!!node.querySelector('.cbi-map-tabbed > [data-tab="disclaimer"][data-tab-active="true"]');
   for(const pane of node.querySelectorAll('.cbi-map-tabbed > [data-tab]'))pane.addEventListener('cbi-tab-active',()=>{this.disclaimerActive=pane.dataset.tab==='disclaimer';if(this.footer)this.footer.hidden=this.disclaimerActive;});
   if(this.footer)this.footer.hidden=this.disclaimerActive;

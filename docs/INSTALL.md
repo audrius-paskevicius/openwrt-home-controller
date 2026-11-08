@@ -30,6 +30,11 @@ driver/helper binaries on another architecture.
    port). Include **https://** explicitly: this service has no HTTP listener or redirect.
    Trust your router's certificate authority on the devices you use to connect.
 
+The short help text under **Advanced → HTTPS port** uses the same hover-help style
+as Wi-Fi Coordinator. It explains that Home Controller's uHTTPd instance serves
+the control page separately from LuCI's main web server. Hover, focus with the
+keyboard, or tap to read the details; tap again or press Escape to dismiss them.
+
 Editors change the form locally. **Save** stores an unapplied draft on the router;
 it survives reloading the page and does not change the running service, even after
 a restart. **Save & Apply** saves and activates the form. **Reset** discards both

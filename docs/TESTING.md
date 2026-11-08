@@ -4,6 +4,17 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.5 web-server help (2026-11-08)
+
+- Added compact help under **HTTPS port**, matching Wi-Fi Coordinator's tooltip
+  presentation. Verified on the installed router using desktop hover, keyboard
+  focus/Escape, and a 375-pixel touch viewport with tap-to-open/tap-to-close.
+- The tooltip remained within the narrow viewport and loaded the packaged help
+  stylesheet. JavaScript syntax and existing form-handler checks passed.
+- The signed package upgrade preserved configuration, credentials and Scheduler
+  state. Backend and radio binaries are unchanged from 0.2.4; no device commands
+  were sent and no settings were saved during help verification.
+
 ## 0.2.4 network selection fix (2026-11-08)
 
 - All 22 Go tests passed on the target ARM router, including regression cases for

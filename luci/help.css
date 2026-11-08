@@ -1,0 +1,11 @@
+/* Match Wi-Fi Coordinator's compact setting help and tooltip presentation. */
+.hc-setting-help{cursor:help}
+.hc-setting-help:focus-visible{outline:1px dotted currentColor;outline-offset:2px}
+.cbi-tooltip.hc-help-tooltip{
+ max-width:min(32em,calc(100vw - 16px));white-space:normal;box-sizing:border-box;
+ padding:10px 12px;line-height:1.5;background:#fffbe8;color:#202830;
+ border:1px solid #9a9275;border-radius:4px;box-shadow:0 3px 12px rgba(0,0,0,.28)
+}
+@media(prefers-color-scheme:dark){
+ .cbi-tooltip.hc-help-tooltip{background:#26313a;color:#f3f5f7;border-color:#8b9aa6;box-shadow:0 3px 12px rgba(0,0,0,.55)}
+}

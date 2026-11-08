@@ -33,7 +33,7 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  const config=JSON.parse(fs.readFileSync('files/config.json'));config.devices=[{id:'sample',name:'Blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All',devices:['sample']}];
  const data={config,account:'home',controllers:[],sunwait:true,networks:['lan','wg_test','wan','wan6']};
  const rpc={declare:spec=>(...args)=>{calls.push({method:spec.method,args});return spec.method==='get'?Promise.resolve(data):respond();}};
- const view=new Function('view','rpc','ui','form','poll','warning','E',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{},form,{add(){}},{gate:(_t,f)=>f()},E);
+ const view=new Function('view','rpc','ui','form','poll','warning','E','L',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{},form,{add(){}},{gate:(_t,f)=>f()},E,{resource:x=>x});
  await view.render(data);
  const networks=view.map.children.find(s=>s.type==='advanced').getOption('networks');
  assert.equal(networks.title,'Allowed networks');assert.deepEqual(networks.keylist,['lan','wg_test']);
