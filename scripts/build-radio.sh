@@ -25,7 +25,7 @@ tar -czf "$ROOT/dist/telldus-core-2.1.3_beta1-source.tar.gz" -C "$(dirname "$SOU
 make package/telldus-core/compile -j2 V=s
 find bin -name 'telldus-core*.apk' -exec cp {} "$ROOT/dist/" \;
 CC=$(find staging_dir/toolchain-* -path '*/bin/*-gcc' | head -1)
-export STAGING_DIR="$PWD/staging_dir"
+export STAGING_DIR="$(find "$PWD/staging_dir" -maxdepth 1 -type d -name 'target-*' | head -1)"
 "$CC" -Os -s "$ROOT/src/radio.c" -ldl -o "$ROOT/dist/home-controller-radio"
 LINK=$(find build_dir -path '*/telldus*/service/CMakeFiles/telldusd.dir/link.txt' | head -1)
 python3 "$ROOT/scripts/build-radio-test.py" "$LINK" "$ROOT"
