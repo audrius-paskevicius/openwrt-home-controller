@@ -16,7 +16,12 @@ P=feeds/packages/utils/telldus-core
 python3 "$ROOT/scripts/prepare-telldus.py" "$P"
 cp "$ROOT/patches/1000-hasta-unit-zero.patch" "$P/patches/"
 echo 'CONFIG_PACKAGE_telldus-core=m' >> .config
+sed -i '/^CONFIG_AUTOREMOVE=/d' .config
+echo '# CONFIG_AUTOREMOVE is not set' >> .config
 make defconfig
+make package/telldus-core/prepare V=s
+SOURCE=$(find build_dir -maxdepth 2 -type d -name 'telldus-core-2.1.3_beta1' | head -1)
+tar -czf "$ROOT/dist/telldus-core-2.1.3_beta1-source.tar.gz" -C "$(dirname "$SOURCE")" "$(basename "$SOURCE")" -C "$PWD/$P/.." telldus-core
 make package/telldus-core/compile -j2 V=s
 find bin -name 'telldus-core*.apk' -exec cp {} "$ROOT/dist/" \;
 CC=$(find staging_dir/toolchain-* -path '*/bin/*-gcc' | head -1)

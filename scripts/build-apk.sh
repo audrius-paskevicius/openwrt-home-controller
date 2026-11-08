@@ -24,7 +24,7 @@ cp luci/home-controller.js "$ROOT/www/luci-static/resources/view/"
 cp files/menu.json "$ROOT/usr/share/luci/menu.d/luci-app-home-controller.json"
 cp files/acl.json "$ROOT/usr/share/rpcd/acl.d/luci-app-home-controller.json"
 printf '/etc/home-controller/\n/etc/tellstick.conf\n' > "$ROOT/lib/upgrade/keep.d/home-controller"
-cp LICENSE DISCLAIMER.txt "$ROOT/usr/share/home-controller/"
+cp LICENSE LICENSE.go-runtime THIRD_PARTY.md DISCLAIMER.txt "$ROOT/usr/share/home-controller/"
 find "$ROOT" -type d -exec chmod 755 {} \;
 find "$ROOT" -type f -exec chmod 644 {} \;
 chmod 755 "$ROOT/usr/bin/home-controller" "$ROOT/usr/libexec/home-controller-radio" "$ROOT/usr/libexec/rpcd/home-controller" "$ROOT/etc/init.d/home-controller" "$ROOT/etc/hotplug.d/iface/95-home-controller" "$ROOT/etc/hotplug.d/usb/95-home-controller"
