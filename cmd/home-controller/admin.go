@@ -65,7 +65,19 @@ func rpc() error {
 		readJSON(base+"/credential.json", &cred)
 		var access any
 		readJSON(run+"/access.json", &access)
-		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": controllers(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
+		available := controllers()
+		var active map[string]string
+		readJSON(run+"/controller.json", &active)
+		connected := false
+		for _, usb := range available {
+			if usb["serial"] == active["serial"] {
+				connected = true
+			}
+		}
+		if !c.Enabled || !connected {
+			active = nil
+		}
+		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "time_utc": time.Now().UTC().Format(time.RFC3339)})
 	case "save":
 		var args struct {
 			Config     string `json:"config"`
@@ -74,11 +86,8 @@ func rpc() error {
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
 		}
-		var c Config
-		if e := decode(strings.NewReader(args.Config), &c); e != nil {
-			return errResult(e)
-		}
-		if e := validate(c); e != nil {
+		c, e := parseConfig(strings.NewReader(args.Config))
+		if e != nil {
 			return errResult(e)
 		}
 		if _, _, e := networkAccess(c); e != nil {
@@ -165,6 +174,23 @@ func controllers() []map[string]string {
 		out = append(out, map[string]string{"serial": read("serial"), "product": read("product"), "bus": read("busnum"), "device": read("devnum")})
 	}
 	return out
+}
+
+// Keep the automatically chosen device while it is connected. With no previous
+// device, sysfs enumeration provides a stable USB-port order. Never require a
+// household administrator to bind configuration to a particular serial number.
+func selectController(available []map[string]string, previous string) map[string]string {
+	for _, usb := range available {
+		if previous != "" && usb["serial"] == previous {
+			return usb
+		}
+	}
+	for _, usb := range available {
+		if usb["serial"] != "" {
+			return usb
+		}
+	}
+	return nil
 }
 
 type iface struct {
@@ -296,12 +322,12 @@ func configure() error {
 	if e != nil {
 		return e
 	}
+	var previous map[string]string
+	readJSON(run+"/controller.json", &previous)
+	selected := selectController(controllers(), previous["serial"])
 	if u, e := user.Lookup("homecontroller"); e == nil {
 		gid, _ := strconv.Atoi(u.Gid)
-		for _, usb := range controllers() {
-			if c.Controller != "" && usb["serial"] != c.Controller {
-				continue
-			}
+		if usb := selected; usb != nil {
 			bus, _ := strconv.Atoi(usb["bus"])
 			dev, _ := strconv.Atoi(usb["device"])
 			if bus > 0 && dev > 0 {
@@ -315,6 +341,10 @@ func configure() error {
 		os.MkdirAll(dir, 0700)
 		own(dir)
 	}
+	if e := atomicJSON(run+"/controller.json", selected); e != nil {
+		return e
+	}
+	own(run + "/controller.json")
 	if c.Timezone == "router" {
 		b, err := exec.Command("/sbin/uci", "-q", "get", "system.@system[0].zonename").Output()
 		if err != nil {
@@ -358,8 +388,8 @@ func configure() error {
 	// Do not override another application's TellStick configuration silently.
 	var radio strings.Builder
 	radio.WriteString("# Managed by Home Controller\nuser = \"homecontroller\"\ngroup = \"homecontroller\"\n")
-	if c.Controller != "" {
-		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", c.Controller)
+	if selected != nil {
+		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", selected["serial"])
 	}
 	for _, d := range c.Devices {
 		fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"hasta\"\n model = \"selflearningv2\"\n controller = 1\n parameters {\n house = %d\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.House, d.Unit)

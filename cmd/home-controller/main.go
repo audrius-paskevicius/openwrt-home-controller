@@ -67,7 +67,7 @@ type Config struct {
 	Timezone    string     `json:"timezone"`
 	Latitude    float64    `json:"latitude"`
 	Longitude   float64    `json:"longitude"`
-	Controller  string     `json:"controller"`
+	Controller  string     `json:"controller,omitempty"` // Accepted only to migrate older configuration.
 	SessionDays int        `json:"session_days"`
 	Devices     []Device   `json:"devices"`
 	Groups      []Group    `json:"groups"`
@@ -196,9 +196,6 @@ func validate(c Config) error {
 	if c.Latitude < -90 || c.Latitude > 90 || c.Longitude < -180 || c.Longitude > 180 {
 		return errors.New("invalid coordinates")
 	}
-	if !regexp.MustCompile(`^[A-Za-z0-9]{0,32}$`).MatchString(c.Controller) {
-		return errors.New("invalid controller serial")
-	}
 	if len(c.Networks) == 0 || len(c.Networks) > 16 {
 		return errors.New("select LAN and/or VPN networks")
 	}
@@ -260,8 +257,17 @@ func validate(c Config) error {
 	return nil
 }
 func loadConfig() (Config, error) {
+	f, e := os.Open(base + "/config.json")
+	if e != nil {
+		return Config{}, e
+	}
+	defer f.Close()
+	return parseConfig(f)
+}
+func parseConfig(r io.Reader) (Config, error) {
 	var c Config
-	e := readJSON(base+"/config.json", &c)
+	e := decode(r, &c)
+	c.Controller = "" // Serial selection is automatic, including after hardware replacement.
 	if e == nil {
 		e = validate(c)
 	}

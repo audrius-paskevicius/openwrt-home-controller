@@ -17,6 +17,39 @@ import (
 func exampleConfig() Config {
 	return Config{Enabled: true, Port: 8443, Networks: []string{"lan"}, Timezone: "Europe/Stockholm", SessionDays: 30, Devices: []Device{{"blind", "Example blind", 1, 1234, 0}}, Groups: []Group{{"all", "All", []string{"blind"}}}}
 }
+func TestAutomaticControllerSelection(t *testing.T) {
+	a := map[string]string{"serial": "TEST_A"}
+	b := map[string]string{"serial": "TEST_B"}
+	for _, tc := range []struct {
+		devices        []map[string]string
+		previous, want string
+	}{
+		{nil, "TEST_A", ""},
+		{[]map[string]string{b}, "TEST_A", "TEST_B"},
+		{[]map[string]string{a, b}, "", "TEST_A"},
+		{[]map[string]string{b, a}, "TEST_A", "TEST_A"},
+	} {
+		if got := selectController(tc.devices, tc.previous)["serial"]; got != tc.want {
+			t.Fatalf("selection: got %q, want %q", got, tc.want)
+		}
+	}
+}
+func TestLegacyControllerConfiguration(t *testing.T) {
+	c := exampleConfig()
+	c.Controller = "DISCONNECTED_OLD_DEVICE"
+	b, _ := json.Marshal(c)
+	got, err := parseConfig(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Controller != "" || len(got.Devices) != len(c.Devices) {
+		t.Fatal("legacy pin retained or devices lost")
+	}
+	b, _ = json.Marshal(got)
+	if bytes.Contains(b, []byte(`"controller"`)) {
+		t.Fatal("obsolete setting still published")
+	}
+}
 func testServer() *Server {
 	c := exampleConfig()
 	s := &Server{config: c, cred: Credential{Revision: "revision"}, states: map[string]DeviceState{}, wake: make(chan bool, 1), attempts: map[string][]time.Time{}}
@@ -37,7 +70,7 @@ func TestConfigurationValidation(t *testing.T) {
 	if e := validate(c); e != nil {
 		t.Fatal(e)
 	}
-	cases := []func(*Config){func(c *Config) { c.Networks = []string{"wan"} }, func(c *Config) { c.Controller = "serial\";" }, func(c *Config) { c.Devices[0].Unit = -1 }, func(c *Config) { c.Devices[0].House = 0 }, func(c *Config) { c.Groups[0].Devices = []string{"missing"} }, func(c *Config) { c.SessionDays = 999 }, func(c *Config) { c.Timezone = "nonsense" }, func(c *Config) { c.Latitude = 91 }}
+	cases := []func(*Config){func(c *Config) { c.Networks = []string{"wan"} }, func(c *Config) { c.Devices[0].Unit = -1 }, func(c *Config) { c.Devices[0].House = 0 }, func(c *Config) { c.Groups[0].Devices = []string{"missing"} }, func(c *Config) { c.SessionDays = 999 }, func(c *Config) { c.Timezone = "nonsense" }, func(c *Config) { c.Latitude = 91 }}
 	for i, change := range cases {
 		c := exampleConfig()
 		change(&c)

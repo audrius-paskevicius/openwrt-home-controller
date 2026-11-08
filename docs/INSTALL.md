@@ -11,8 +11,8 @@ driver/helper binaries on another architecture.
    Install `sunwait` through OpenWrt's package manager for solar schedules.
 3. Open **Services → Home Controller** in LuCI. Set a separate household username and
    password (at least 12 characters). No default household password is shipped.
-4. Select the TellStick serial shown under detected controllers, enter your devices
-   and optional groups, and configure allowed LAN/VPN logical networks.
+4. Connect a TellStick, enter your devices and optional groups, and configure allowed
+   LAN/VPN logical networks. TellStick selection is automatic.
 5. Set coordinates for your location. Keep time zone `router` to follow OpenWrt's
    time-zone setting. Ensure the router's date/time and NTP setup are correct.
 6. Enable the service and save. Open `https://ROUTER-LAN-ADDRESS:8443/` (or your chosen
@@ -60,8 +60,11 @@ sessions remain valid until expiry or revocation.
 
 ## Hardware replacement
 
-Connect a compatible original TellStick or TellStick Duo, choose its detected serial
-in LuCI, and save. Existing blind addresses remain independent of controller selection.
+Connect a compatible original TellStick or TellStick Duo; no serial setting or save
+is required. Existing blind addresses remain unchanged. When several TellSticks are
+connected, LuCI identifies the one selected automatically. The current device is kept
+while connected; otherwise the first available device in USB-port order is selected.
+Old manually configured serial numbers are ignored and removed on the next save.
 USB hotplug refreshes permissions and service access. New controller models or firmware
 may require additional support and must be tested; this is not a promise of universal
 Telldus hardware compatibility. No firmware is flashed by this package.
