@@ -22,6 +22,7 @@ cp DISCLAIMER.txt "$ROOT/usr/share/home-controller/www/disclaimer.txt"
 for op in login logout state command page scheduler; do printf '#!/bin/sh\nexec /usr/bin/home-controller\n' > "$ROOT/usr/share/home-controller/www/api/$op"; done
 cp luci/home-controller.js "$ROOT/www/luci-static/resources/view/"
 cp luci/disclaimer.js "$ROOT/www/luci-static/resources/home-controller-disclaimer.js"
+cp luci/disclaimer.css "$ROOT/www/luci-static/resources/home-controller-disclaimer.css"
 cp DISCLAIMER.txt "$ROOT/www/luci-static/resources/home-controller-disclaimer.txt"
 cp files/menu.json "$ROOT/usr/share/luci/menu.d/luci-app-home-controller.json"
 cp files/acl.json "$ROOT/usr/share/rpcd/acl.d/luci-app-home-controller.json"

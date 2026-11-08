@@ -36,7 +36,8 @@ Both interfaces show the project disclaimer before first use. Acknowledgement is
 remembered in that browser for the exact text. Changed wording asks again; blocked
 browser storage means acknowledgement lasts only for the current page visit.
 Acknowledgement does not start or stop the service or Scheduler. Read the text again
-from **General → Read warning** or the control page's **Disclaimer** link.
+from LuCI's **Experimental, AI-generated software. Use at your own risk.** tab
+or the control page's **Disclaimer** link.
 
 Home Controller creates its own HTTPS key. If the router has the `router-ca`
 Easy-RSA helper, it requests a separate certificate from that local CA; otherwise

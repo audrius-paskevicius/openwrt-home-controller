@@ -1,0 +1,5 @@
+/* Match Wi-Fi Coordinator's disclaimer notice; settings use the LuCI theme. */
+.hc-disclaimer-notice{padding:1.25rem;border:2px solid #b76600;background:#fffaf0;color:#302315;max-width:64rem;line-height:1.6}
+.hc-disclaimer-notice h3{font-weight:700;line-height:1.4}
+.hc-disclaimer-notice p{margin:1em 0}
+.hc-disclaimer-notice p:last-child{font-weight:700}

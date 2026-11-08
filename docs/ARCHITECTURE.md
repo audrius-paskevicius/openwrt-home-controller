@@ -15,8 +15,9 @@ The LuCI page calls an administrator-only rpcd plugin. It validates configuratio
 before applying it. Control access never grants a router session or exposes
 configuration, command execution, arbitrary file access, or radio addresses.
 LuCI uses native `form.JSONMap`, tabbed sections, `GridSection` tables, modal editors,
-input validation and the standard view action bar. No administration stylesheet is
-loaded. Control symbols are fixed SVG paths selected by a validated name,
+input validation and the standard view action bar. Settings use the active LuCI
+theme; only the disclaimer notice has scoped styling matching Wi-Fi Coordinator.
+Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
 
 The JSON configuration has a separate root-only `pending.json` draft. RPC `stage`

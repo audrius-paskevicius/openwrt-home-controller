@@ -71,7 +71,6 @@ return view.extend({
   const enabled=s.option(form.Flag,'enabled','Enable service','To pause scheduled actions only, use Scheduler on the control page.');enabled.rmempty=false;
   const service=E('span'),controller=E('span'),scheduler=E('span'),links=E('span');
   dummy(s,'_service','Service',()=>service);dummy(s,'_controller','TellStick',()=>controller);dummy(s,'_scheduler','Scheduler',()=>scheduler);dummy(s,'_links','Control page',()=>links);
-  command(s,'_warning','Disclaimer','Read warning',()=>{warning.show(this.disclaimer);return '';});
   const updateStatus=d=>{
    fresh=d;const active=d.active_config||d.config;service.textContent=active.enabled?'Enabled':'Disabled';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
    const devices=d.controllers||[];controller.textContent=devices.length>1?(d.active_controller?'Using '+d.active_controller.product+' ('+d.active_controller.serial+')':'Selected automatically when started'):(devices.length?'Connected':'Not connected');
@@ -138,12 +137,18 @@ return view.extend({
   value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))');choice(advanced,form.MultiValue,'networks','LAN networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].map(n=>[n,n])),'VPN tunnels are detected automatically. WAN is excluded. Existing firewall restrictions still apply.');
   command(advanced,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},null,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
-  const node=await m.render();if(this.footer)this.footer.hidden=false;tell(this.saveMessage||(this.saveMessage=feedback()),data.pending?'Saved changes are waiting to be applied.':'');return node;
+  const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');
+  disclaimer.render=()=>E('div',{'class':'cbi-section','data-tab':'disclaimer','data-tab-title':disclaimer.title},warning.page(this.disclaimer));
+  const node=await m.render();
+  this.disclaimerActive=!!node.querySelector('.cbi-map-tabbed > [data-tab="disclaimer"][data-tab-active="true"]');
+  for(const pane of node.querySelectorAll('.cbi-map-tabbed > [data-tab]'))pane.addEventListener('cbi-tab-active',()=>{this.disclaimerActive=pane.dataset.tab==='disclaimer';if(this.footer)this.footer.hidden=this.disclaimerActive;});
+  if(this.footer)this.footer.hidden=this.disclaimerActive;
+  tell(this.saveMessage||(this.saveMessage=feedback()),data.pending?'Saved changes are waiting to be applied.':'');return node;
  },
  addFooter(){
   this.saveMessage ||= feedback();
   // The native LuCI action bar; this package stores its configuration outside UCI.
-  this.footer=E('div',{hidden:this.map?null:''},[this.saveMessage,view.prototype.addFooter.call(this)]);return this.footer;
+  this.footer=E('div',{hidden:this.map&&!this.disclaimerActive?null:''},[this.saveMessage,view.prototype.addFooter.call(this)]);return this.footer;
  },
  async saveConfiguration(activate){
   if(!this.map||this.saving)return;this.saving=true;tell(this.saveMessage,activate?'Applying…':'Saving…');

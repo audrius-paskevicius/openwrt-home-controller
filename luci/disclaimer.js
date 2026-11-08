@@ -12,6 +12,11 @@ function accepted(text){
 }
 function fullText(text){return E('div',{},text.trim().split(/\n\s*\n/).map((p,i)=>E(i?'p':'h3',{},p)));}
 return L.Class.extend({
+ page:function(text){return E('div',{},[
+  E('link',{rel:'stylesheet',href:L.resource('home-controller-disclaimer.css')+'?v=023'}),
+  E('h2',{},'Home Controller: disclaimer'),
+  E('section',{class:'hc-disclaimer-notice'},fullText(text))
+ ]);},
  load:function(){return request.get(L.resource('home-controller-disclaimer.txt'),{cache:false,timeout:10000}).then(response=>{
   if(!response.ok)throw Error('Unable to load the Home Controller warning.');
   const text=response.text();if(!text.trim())throw Error('The Home Controller warning is empty.');return text;

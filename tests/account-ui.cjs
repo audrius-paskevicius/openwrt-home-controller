@@ -5,7 +5,7 @@ class Node {
  constructor(tag,attrs={},children=[]){this.tag=tag;this.attrs=attrs;this.children=[];this.classList={toggle(){}};this.append(...(Array.isArray(children)?children:[children]));}
  append(...items){this.children.push(...items);}replaceChildren(...items){this.children=items;}
  set textContent(v){this.children=[v];}get textContent(){return this.children.map(x=>typeof x==='string'?x:x?.textContent||'').join('');}
- replaceWith(){}querySelector(){return null;}
+ replaceWith(){}querySelector(){return null;}querySelectorAll(){return [];}
 }
 const E=(...args)=>new Node(...args);
 class Option {
