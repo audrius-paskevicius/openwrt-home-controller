@@ -59,7 +59,7 @@ func TestHouseholdAuthorization(t *testing.T) {
 	s := testServer()
 	tok := strings.Repeat("a", 64)
 	s.sessions = []Session{{Hash: hash(tok), CSRF: "csrf", Expires: time.Now().Add(time.Hour).Unix(), Revision: "revision"}}
-	headers := map[string]string{"Cookie": cookieName + "=" + tok, "Content-Type": "application/json", "X-Home-Controller": "1", "X-CSRF-Token": "csrf"}
+	headers := map[string]string{"Cookie": cookieName + "=" + tok, "Content-Type": "application/json", "X-Home-Controller": "1", "Authorization": "Bearer csrf"}
 	if request(s, "GET", "/api/state", "", nil).Code != 401 {
 		t.Fatal("unauthenticated state")
 	}
@@ -77,7 +77,7 @@ func TestHouseholdAuthorization(t *testing.T) {
 		t.Fatal("cross origin accepted")
 	}
 	bad["Origin"] = "https://router:8443"
-	bad["X-CSRF-Token"] = "wrong"
+	bad["Authorization"] = "Bearer wrong"
 	if request(s, "POST", "/api/command", `{}`, bad).Code != 403 {
 		t.Fatal("CSRF accepted")
 	}
@@ -189,5 +189,45 @@ func TestCookiePolicy(t *testing.T) {
 	c := http.Cookie{Name: cookieName, Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/"}
 	if !strings.Contains(c.String(), "SameSite=Strict") {
 		t.Fatal(c)
+	}
+}
+
+func TestInstalledSunwait(t *testing.T) {
+	if !exists("/usr/bin/sunwait") {
+		t.Skip("target integration test requires sunwait")
+	}
+	c := exampleConfig()
+	c.Latitude = 51.4779
+	c.Longitude = 0
+	loc, _ := time.LoadLocation("Europe/Stockholm")
+	r := Schedule{Event: "sunrise"}
+	for _, date := range []struct {
+		month time.Month
+		day   int
+		delta time.Duration
+	}{{3, 28, time.Hour}, {10, 24, -time.Hour}} {
+		d := time.Date(2026, date.month, date.day, 0, 0, 0, 0, loc)
+		a, e := solar(c, r, d)
+		if e != nil {
+			t.Fatal(e)
+		}
+		b, e := solar(c, r, d.AddDate(0, 0, 1))
+		if e != nil {
+			t.Fatal(e)
+		}
+		utcDiff := b.Sub(a) - 24*time.Hour
+		if utcDiff < -10*time.Minute || utcDiff > 10*time.Minute {
+			t.Fatal("UTC discontinuity", a, b)
+		}
+		wallDiff := time.Duration((b.Hour()-a.Hour())*60+b.Minute()-a.Minute()) * time.Minute
+		if wallDiff-date.delta < -10*time.Minute || wallDiff-date.delta > 10*time.Minute {
+			t.Fatal("DST conversion", a, b)
+		}
+	}
+	c.Latitude = 80
+	for _, month := range []time.Month{6, 12} {
+		if _, e := solar(c, r, time.Date(2026, month, 21, 0, 0, 0, 0, loc)); e == nil {
+			t.Fatal("invented polar solar event")
+		}
 	}
 }

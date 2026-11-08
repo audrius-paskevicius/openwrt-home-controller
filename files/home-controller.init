@@ -11,6 +11,7 @@ start_service() {
  procd_set_param command /usr/bin/home-controller serve
  procd_set_param user homecontroller
  procd_set_param group homecontroller
+ procd_set_param env GOMEMLIMIT=24MiB
  procd_set_param respawn 3600 5 5
  procd_set_param stdout 1
  procd_set_param stderr 1
@@ -28,4 +29,4 @@ start_service() {
  procd_close_instance
 }
 reload_service() { restart; }
-service_triggers() { procd_add_reload_trigger home_controller network firewall; }
+service_triggers() { procd_add_reload_trigger home_controller network firewall system; }

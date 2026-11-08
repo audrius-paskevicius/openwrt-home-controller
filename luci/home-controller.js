@@ -19,7 +19,7 @@ return view.extend({
  const enabled=select('Service',String(c.enabled),[['false','Disabled'],['true','Enabled']]);
  const port=field('HTTPS port',c.port,'number'),networks=field('Allowed logical networks (comma separated; active VPN tunnels are also detected)',c.networks.join(', '));
  const serial=field('TellStick serial (choose the replacement serial when swapping hardware)',c.controller);
- const zone=field('Time zone',c.timezone),lat=field('Latitude',c.latitude,'number'),lon=field('Longitude',c.longitude,'number'),days=field('Remember household sessions for days',c.session_days,'number');lat.input.step=lon.input.step='any';
+ const zone=field('Time zone (router = follow router setting)',c.timezone),lat=field('Latitude',c.latitude,'number'),lon=field('Longitude',c.longitude,'number'),days=field('Remember household sessions for days',c.session_days,'number');lat.input.step=lon.input.step='any';
  [enabled,port,networks,serial,zone,lat,lon,days].forEach(x=>general.append(x.node));
  general.append(E('p',{},data.sunwait?'Sunwait is available.':'Solar schedules need the optional sunwait package.'));
  if(data.access)general.append(E('pre',{},JSON.stringify(data.access,null,2)));

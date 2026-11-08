@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 function message(text) { $('message').textContent = text; }
 async function api(path, body) {
  const options = { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) };
- if (body !== undefined) Object.assign(options, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Home-Controller': '1', 'X-CSRF-Token': csrf }, body: JSON.stringify(body) });
+ if (body !== undefined) Object.assign(options, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + csrf }, body: JSON.stringify(body) });
  const response = await fetch('/api/' + path, options);
  const data = await response.json();
  if (!response.ok) { if (response.status === 401) showLogin(); throw new Error(data.error || 'Request failed'); }

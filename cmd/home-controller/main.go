@@ -189,7 +189,7 @@ func validate(c Config) error {
 	if c.Port < 1024 || c.Port > 65535 || c.SessionDays < 1 || c.SessionDays > 90 {
 		return errors.New("port must be 1024..65535; session days 1..90")
 	}
-	if _, e := time.LoadLocation(c.Timezone); e != nil {
+	if _, e := time.LoadLocation(c.Timezone); e != nil && c.Timezone != "router" {
 		return errors.New("unknown time zone")
 	}
 	if c.Latitude < -90 || c.Latitude > 90 || c.Longitude < -180 || c.Longitude > 180 {
@@ -338,7 +338,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		if r.Header.Get("Content-Type") != "application/json" || r.Header.Get("X-Home-Controller") != "1" {
+		if r.Header.Get("Content-Type") != "application/json" {
 			fail(w, 403, "request protection required")
 			return
 		}
@@ -403,7 +403,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "login required")
 		return
 	}
-	if r.Method == "POST" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(session.CSRF)) != 1 {
+	if r.Method == "POST" && subtle.ConstantTimeCompare([]byte(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")), []byte(session.CSRF)) != 1 {
 		fail(w, 403, "invalid request token")
 		return
 	}
@@ -561,7 +561,10 @@ func solar(c Config, s Schedule, day time.Time) (time.Time, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "/usr/bin/sunwait", "list", "1", "gmt", kind, rise, "y", strconv.Itoa(day.Year()), "m", strconv.Itoa(int(day.Month())), "d", strconv.Itoa(day.Day()), coord(c.Latitude, "N", "S"), coord(c.Longitude, "E", "W"))
+	if day.Year() < 2000 || day.Year() > 2099 {
+		return time.Time{}, errors.New("sunwait supports years 2000..2099")
+	}
+	cmd := exec.CommandContext(ctx, "/usr/bin/sunwait", "list", "1", "gmt", kind, rise, "y", strconv.Itoa(day.Year()%100), "m", strconv.Itoa(int(day.Month())), "d", strconv.Itoa(day.Day()), coord(c.Latitude, "N", "S"), coord(c.Longitude, "E", "W"))
 	cmd.Env = []string{"TZ=UTC", "PATH=/usr/bin:/bin"}
 	out, e := cmd.Output()
 	if e != nil {
@@ -661,11 +664,37 @@ func serve() error {
 	if e != nil {
 		return e
 	}
+	if c.Timezone == "router" {
+		b, e := exec.Command("/sbin/uci", "-q", "get", "system.@system[0].zonename").Output()
+		if e != nil {
+			return errors.New("router time zone unavailable")
+		}
+		c.Timezone = strings.TrimSpace(string(b))
+		if _, e = time.LoadLocation(c.Timezone); e != nil {
+			return e
+		}
+	}
 	s := &Server{config: c, states: map[string]DeviceState{}, wake: make(chan bool, 1), attempts: map[string][]time.Time{}}
 	readJSON(base+"/credential.json", &s.cred)
 	readJSON(base+"/state/sessions.json", &s.sessions)
 	s.sender = s.send
-	s.solar = func(r Schedule, d time.Time) (time.Time, error) { return solar(c, r, d) }
+	type solarResult struct {
+		at  time.Time
+		err error
+	}
+	cache := map[string]solarResult{}
+	s.solar = func(r Schedule, d time.Time) (time.Time, error) {
+		key := r.Event + d.Format("2006-01-02")
+		if v, ok := cache[key]; ok {
+			return v.at, v.err
+		}
+		if len(cache) > 32 {
+			cache = map[string]solarResult{}
+		}
+		at, e := solar(c, r, d)
+		cache[key] = solarResult{at, e}
+		return at, e
+	}
 	os.MkdirAll(run, 0700)
 	os.Remove(run + "/api.sock")
 	ln, e := net.Listen("unix", run+"/api.sock")
@@ -678,6 +707,20 @@ func serve() error {
 	return (&http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, MaxHeaderBytes: 8192}).Serve(ln)
 }
 func proxy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'")
+	if r.URL.Path == "/api/page" && r.Method == "GET" {
+		b, e := os.ReadFile("/usr/share/home-controller/page.html")
+		if e != nil {
+			fail(w, 503, "page unavailable")
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(b)
+		return
+	}
 	if !map[string]bool{"/api/login": true, "/api/logout": true, "/api/state": true, "/api/command": true}[r.URL.Path] {
 		fail(w, 404, "not found")
 		return
@@ -693,7 +736,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Host = r.Host
-	for _, h := range []string{"Cookie", "Content-Type", "Origin", "X-Home-Controller", "X-CSRF-Token", "User-Agent"} {
+	for _, h := range []string{"Cookie", "Content-Type", "Origin", "Authorization", "User-Agent"} {
 		req.Header.Set(h, r.Header.Get(h))
 	}
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)

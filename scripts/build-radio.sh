@@ -6,8 +6,8 @@ SDK_NAME=openwrt-sdk-${SDK_VERSION}-mvebu-cortexa9_gcc-14.3.0_musl_eabi.Linux-x8
 BASE=https://downloads.openwrt.org/releases/$SDK_VERSION/targets/mvebu/cortexa9
 mkdir -p build dist
 cd build
-curl -fL "$BASE/$SDK_NAME.tar.zst" -o sdk.tar.zst
-curl -fL "$BASE/sha256sums" -o sums
+curl -fL --connect-timeout 20 --speed-limit 1024 --speed-time 30 --retry 8 --retry-all-errors -C - "$BASE/$SDK_NAME.tar.zst" -o sdk.tar.zst
+curl -fL --connect-timeout 20 --max-time 120 --retry 3 "$BASE/sha256sums" -o sums
 grep " $SDK_NAME.tar.zst\$" sums | sed "s|$SDK_NAME.tar.zst|sdk.tar.zst|" | sha256sum -c -
 tar --zstd -xf sdk.tar.zst
 cd "$SDK_NAME"

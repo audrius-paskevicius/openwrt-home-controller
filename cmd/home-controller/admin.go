@@ -21,7 +21,17 @@ func own(path string) {
 	}
 	uid, _ := strconv.Atoi(u.Uid)
 	gid, _ := strconv.Atoi(u.Gid)
-	os.Chown(path, uid, gid)
+	os.Lchown(path, uid, gid)
+}
+
+func adminFile(path string) {
+	u, e := user.Lookup("homecontroller")
+	if e != nil {
+		return
+	}
+	gid, _ := strconv.Atoi(u.Gid)
+	os.Lchown(path, 0, gid)
+	os.Chmod(path, 0640)
 }
 func rpc() error {
 	if os.Geteuid() != 0 {
@@ -70,7 +80,7 @@ func rpc() error {
 		if e := atomicJSON(base+"/config.json", c); e != nil {
 			return errResult(e)
 		}
-		own(base + "/config.json")
+		adminFile(base + "/config.json")
 		restart()
 		respond(map[string]bool{"ok": true})
 	case "password":
@@ -89,7 +99,7 @@ func rpc() error {
 		if e := atomicJSON(base+"/credential.json", c); e != nil {
 			return errResult(e)
 		}
-		own(base + "/credential.json")
+		adminFile(base + "/credential.json")
 		atomicJSON(base+"/state/sessions.json", []Session{})
 		own(base + "/state/sessions.json")
 		restart()
@@ -101,7 +111,7 @@ func rpc() error {
 		}
 		c.Revision = token()
 		atomicJSON(base+"/credential.json", c)
-		own(base + "/credential.json")
+		adminFile(base + "/credential.json")
 		atomicJSON(base+"/state/sessions.json", []Session{})
 		own(base + "/state/sessions.json")
 		restart()
@@ -188,7 +198,7 @@ func networkAccess(c Config) ([]string, []string, error) {
 	// OpenVPN can create tun/tap interfaces outside netifd. Include active ones.
 	links, _ := net.Interfaces()
 	for _, i := range links {
-		if i.Flags&net.FlagUp != 0 && !denied[i.Name] && (strings.HasPrefix(i.Name, "tun") || strings.HasPrefix(i.Name, "tap") || strings.HasPrefix(i.Name, "xfrm")) && regexpDevice(i.Name) {
+		if i.Flags&net.FlagUp != 0 && !denied[i.Name] && (exists("/sys/class/net/"+i.Name+"/tun_flags") || strings.HasPrefix(i.Name, "tun") || strings.HasPrefix(i.Name, "tap") || strings.HasPrefix(i.Name, "xfrm")) && regexpDevice(i.Name) {
 			devices = append(devices, i.Name)
 			addresses, _ := i.Addrs()
 			for _, a := range addresses {
@@ -202,6 +212,37 @@ func networkAccess(c Config) ([]string, []string, error) {
 	if len(binds) == 0 {
 		return nil, nil, errors.New("no permitted LAN/VPN address is active")
 	}
+	// Include IPv6 prefix-assigned LAN addresses, which netifd does not list
+	// in ipv6-address. Never bind a device not already admitted above.
+	for _, name := range devices {
+		if name == "lo" {
+			continue
+		}
+		i, e := net.InterfaceByName(name)
+		if e != nil {
+			continue
+		}
+		addresses, _ := i.Addrs()
+		for _, a := range addresses {
+			ip, _, e := net.ParseCIDR(a.String())
+			if e == nil && !ip.IsLinkLocalUnicast() {
+				binds = append(binds, net.JoinHostPort(ip.String(), strconv.Itoa(c.Port)))
+			}
+		}
+	}
+	unique := func(items []string) []string {
+		out := []string{}
+		seen := map[string]bool{}
+		for _, v := range items {
+			if !seen[v] {
+				out = append(out, v)
+				seen[v] = true
+			}
+		}
+		return out
+	}
+	devices = unique(devices)
+	binds = unique(binds)
 	return devices, binds, nil
 }
 func regexpDevice(s string) bool {
@@ -227,12 +268,12 @@ func configure() error {
 	if e != nil {
 		return e
 	}
-	for _, dir := range []string{base, base + "/state", run} {
+	for _, dir := range []string{base + "/state", run} {
 		os.MkdirAll(dir, 0700)
 		own(dir)
 	}
-	for _, p := range []string{"config.json", "credential.json", "state/sessions.json"} {
-		own(base + "/" + p)
+	for _, p := range []string{"config.json", "credential.json"} {
+		adminFile(base + "/" + p)
 	}
 	// Dedicated firewall table is evaluated before the regular router input chains.
 	exec.Command("/usr/sbin/nft", "delete", "table", "inet", "home_controller").Run()
@@ -240,7 +281,7 @@ func configure() error {
 	for _, d := range devices {
 		quoted = append(quoted, strconv.Quote(d))
 	}
-	rules := fmt.Sprintf("table inet home_controller { chain input { type filter hook input priority -10; policy accept; tcp dport %d iifname != { %s } drop; } }\n", c.Port, strings.Join(quoted, ", "))
+	rules := fmt.Sprintf("table inet home_controller {\n chain input {\n type filter hook input priority -10; policy accept;\n tcp dport %d iifname != { %s } drop;\n }\n}\n", c.Port, strings.Join(quoted, ", "))
 	cmd := exec.Command("/usr/sbin/nft", "-f", "-")
 	cmd.Stdin = strings.NewReader(rules)
 	if out, e := cmd.CombinedOutput(); e != nil {
@@ -269,7 +310,7 @@ func configure() error {
 	if e = os.WriteFile("/etc/tellstick.conf", []byte(radio.String()), 0600); e != nil {
 		return e
 	}
-	own("/etc/tellstick.conf")
+	adminFile("/etc/tellstick.conf")
 	for _, p := range []string{base + "/tls.crt", base + "/tls.key"} {
 		if !exists(p) {
 			return errors.New("configure TLS certificate and key before enabling")
@@ -283,7 +324,16 @@ func configure() error {
 		lines = append(lines, "'"+strings.ReplaceAll(a, "'", "'\\''")+"'")
 	}
 	p := filepath.Join(run, "uhttpd.args")
-	e = os.WriteFile(p, []byte(strings.Join(lines, " ")), 0600)
+	f, err := os.CreateTemp(run, ".args-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, e = f.WriteString(strings.Join(lines, " "))
+	f.Close()
+	if e == nil {
+		e = os.Rename(f.Name(), p)
+	}
 	own(p)
 	return e
 }

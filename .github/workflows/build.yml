@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
-  build:
+  application:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -14,8 +14,20 @@ jobs:
       - run: |
           mkdir -p dist
           GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/home-controller ./cmd/home-controller
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application
+          path: dist/home-controller
+  radio:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/sdk.tar.zst
+          key: sdk-25.12.6-mvebu-cortexa9
       - run: bash scripts/build-radio.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: router-binaries
+          name: radio
           path: dist/
