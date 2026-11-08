@@ -14,6 +14,8 @@ s = s.replace('PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz', 'PKG_SOURCE:=tell
 s = s.replace('PKG_SOURCE_URL:=http://download.telldus.com/TellStick/Software/telldus-core/', 'PKG_SOURCE_URL:=' + url + '?')
 import re
 s = re.sub(r'PKG_HASH:=.*', 'PKG_HASH:=' + digest, s)
+# The tagged GitHub source retains upstream's source-tree opt-in switch.
+s = s.replace('-DBUILD_LIBTELLDUS-CORE=1', '-DFORCE_COMPILE_FROM_TRUNK=1 -DBUILD_LIBTELLDUS-CORE=1')
 p.write_text(s)
 # These warning fixes are already present in 2.1.3-beta1.
 (p.parent / 'patches' / '110-fix_warnings.patch').unlink(missing_ok=True)
