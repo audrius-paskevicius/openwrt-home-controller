@@ -44,12 +44,13 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  const admin=await connection();try{
  const config=JSON.parse(fs.readFileSync('files/config.json','utf8'));config.devices=[{id:'sample',name:'Test blind',radio_id:1,house:1234,unit:0}];config.groups=[{id:'all',name:'All blinds',devices:['sample']}];
  await admin.run(`window.saved=[];window.failSave=false;window.data=${JSON.stringify({config,account:'household',controllers:[],networks:['lan'],sunwait:true,status:{scheduler:fixture.scheduler}})};
- window.E=(tag,attrs={},children=[])=>{const e=document.createElement(tag);for(const [key,value] of Object.entries(attrs)){if(typeof value==='function')e.addEventListener(key,value);else if(key==='class')e.className=value;else if(typeof value==='boolean'){if(value)e.setAttribute(key,'');}else e.setAttribute(key,value);}for(const c of Array.isArray(children)?children:[children])e.append(c);return e;};
+ window.E=(tag,attrs={},children=[])=>{const e=document.createElement(tag);for(const [key,value] of Object.entries(attrs)){if(typeof value==='function')e.addEventListener(key,value);else if(key==='class')e.className=value;else e.setAttribute(key,value);}for(const c of Array.isArray(children)?children:[children])e.append(c);return e;};
  window.ui={showModal:(title,children)=>{ui.hideModal();const m=E('div',{id:'modal'},[E('h2',{},title),...children]);document.body.append(m);},hideModal:()=>document.getElementById('modal')?.remove()};
  window.rpc={declare:spec=>(...args)=>{if(spec.method==='save'){if(failSave){failSave=false;return Promise.resolve({error:'Synthetic save failure'});}saved.push(JSON.parse(args[0]));return Promise.resolve({ok:true});}return Promise.resolve(data);}};window.poll={add:()=>{}};window.view={extend:x=>x};`);
  await admin.run(`document.body.append(new Function('view','rpc','ui','E','poll',${JSON.stringify(fs.readFileSync('luci/home-controller.js','utf8'))})(view,rpc,ui,E,poll).render(data));document.head.append(E('style',{},${JSON.stringify(fs.readFileSync('luci/home-controller.css','utf8'))}));window.press=text=>[...document.querySelectorAll('button')].find(x=>x.textContent===text).click();window.input=label=>[...document.querySelectorAll('#modal label')].find(x=>x.firstChild.textContent===label).querySelector('input,select');`);
  assert.equal(await admin.run('document.querySelectorAll("[role=tab]").length'),5);
  await admin.run('press("Devices & groups")');assert.equal(await admin.run('document.getElementById("hc-panel-devices").hidden'),false);
+ await admin.run('press("Edit")');assert.equal(await admin.run('document.querySelector("#modal details").open'),false);await admin.run('press("Close")');
  await admin.run('press("Add device");input("Name").value="Second blind";input("House code").value="1235";input("Unit").value="1";press("Save changes")');
  assert.equal(await admin.run('saved.at(-1).devices.length'),2);assert.match(await admin.run('saved.at(-1).devices[1].id'),/^device_/);
  await admin.run('press("Save changes")');assert.equal(await admin.run('saved.at(-1).devices.length'),2);
@@ -60,6 +61,8 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await admin.run('document.querySelector("#hc-panel-schedules .hc-row").parentNode.querySelector("[role=status]").textContent'),'Saved.');
  await admin.run('failSave=true;toggle=document.querySelector("#hc-panel-schedules input[type=checkbox]");toggle.checked=false;toggle.dispatchEvent(new Event("change"))');
  assert.equal(await admin.run('toggle.checked'),true);assert.equal(await admin.run('document.querySelector("#hc-panel-schedules .hc-row").parentNode.querySelector("[role=status]").textContent'),'Synthetic save failure');
+ await admin.run('[...document.querySelectorAll("#hc-panel-schedules button")].find(x=>x.textContent==="Delete").click();[...document.querySelectorAll("#modal button")].find(x=>x.textContent==="Delete").click()');
+ assert.equal(await admin.run('saved.at(-1).schedules.length'),0);assert.equal(await admin.run('[...document.querySelectorAll("#modal button")].map(x=>x.textContent).join()'),'Close');
  console.log('PASS: LuCI tabs, device auto-ID and repeated save, disabled schedule defaults, weekday/time controls, inline success/error with checkbox rollback (synthetic RPC)');
  }finally{await admin.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

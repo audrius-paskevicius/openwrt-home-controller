@@ -63,15 +63,15 @@ return view.extend({
   function removeItem(key,item){
    const references=[];if(key==='devices')for(const g of c.groups)if(g.devices.includes(item.id))references.push('group '+g.name);
    if(key!=='schedules')for(const s of c.schedules)if(s.target===item.id)references.push('a schedule for '+nameFor(item.id));
-   const message=feedback();let actions=[button('Cancel',()=>ui.hideModal())];
-   if(!references.length){const remove=button('Delete',async()=>{const next=clone(c);next[key]=next[key].filter(x=>x.id!==item.id);await commit(next,remove,message,()=>{remove.hidden=true;});});actions.push(remove);}
+   const message=feedback(),cancel=button('Cancel',()=>ui.hideModal());let actions=[cancel];
+   if(!references.length){const remove=button('Delete',async()=>{const next=clone(c);next[key]=next[key].filter(x=>x.id!==item.id);await commit(next,remove,message,()=>{remove.remove();cancel.textContent='Close';});});actions.push(remove);}
    ui.showModal('Delete '+(item.name||'schedule')+'?',[E('p',{},references.length?'Used by '+references.join(', ')+'. Edit those references first.':'This removes the configuration. It does not send a radio command.'),message,E('div',{class:'hc-actions'},actions)]);
   }
   function editDevice(existing){
    const used=new Set(c.devices.map(x=>x.radio_id));let radio=1;while(used.has(radio))radio++;
    const d=clone(existing||{id:uniqueId('device'),name:'',radio_id:radio,house:'',unit:1});
    const name=field('Name',d.name),house=field('House code',d.house,'number'),unit=field('Unit',d.unit,'number');name.input.maxLength=80;house.input.min=1;house.input.max=65535;unit.input.min=0;unit.input.max=15;
-   const details=E('details',{open:!existing},[E('summary',{},'Radio details'),E('p',{class:'hc-muted'},'Hasta selflearningv2. These codes stay the same when replacing the TellStick.'),E('div',{class:'hc-fields'},[house.node,unit.node])]);
+   const details=E('details',existing?{}:{open:''},[E('summary',{},'Radio details'),E('p',{class:'hc-muted'},'Hasta selflearningv2. These codes stay the same when replacing the TellStick.'),E('div',{class:'hc-fields'},[house.node,unit.node])]);
    modal(existing?'Edit device':'Add device',[name.node,details],()=>{const value=name.input.value.trim();if(!value)throw Error('Enter a device name.');return Object.assign({},d,{name:value,house:integer(house,1,65535),unit:integer(unit,0,15)});},'devices',d.id);
   }
   function editGroup(existing){const g=clone(existing||{id:uniqueId('group'),name:'',devices:[]}),name=field('Name',g.name);name.input.maxLength=80;

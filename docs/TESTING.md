@@ -9,6 +9,15 @@ vertical touch controls and no horizontal overflow at 320/390/1024 pixels, sched
 success/error feedback, LuCI tabs, generated device IDs, repeated editor saves,
 schedule defaults and inline enable/error feedback. These tests do not transmit RF.
 
+All 18 backend tests passed on the target router, including installed sunwait.
+Live HTTPS checks verified scheduler authentication, CSRF/origin/method validation,
+Stop surviving a service restart, the remembered session surviving that restart,
+and Start resuming. The production household page loaded with its normal CSP and
+stylesheet at mobile width; login, Start/Stop and Sign out worked. Actual LuCI tabs,
+native editors and inline password validation were checked. A disabled schedule
+was saved and deleted through LuCI; no test schedule remains. This release's live
+checks issued no blind commands and did not modify the separate FHEM host.
+
 Version 0.1.2 removes the minimum household-password length. Validation accepts
 short non-empty passwords, rejects empty/overlong values, and counts Unicode
 characters consistently. The LuCI handler test exercises inline saving, success,
