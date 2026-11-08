@@ -27,6 +27,13 @@ jobs:
           path: build/sdk.tar.zst
           key: sdk-25.12.6-mvebu-cortexa9
       - run: bash scripts/build-radio.sh
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            build/sdk.tar.zst
+            build/sdk-parts
+          key: sdk-25.12.6-mvebu-cortexa9-ranges
       - uses: actions/upload-artifact@v4
         with:
           name: radio

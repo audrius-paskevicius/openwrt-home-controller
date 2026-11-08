@@ -33,6 +33,7 @@ const run = "/var/run/home-controller"
 const cookieName = "__Host-homecontroller"
 
 var idRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+var errNoSolarEvent = errors.New("solar event does not occur")
 
 type Device struct {
 	ID      string `json:"id"`
@@ -572,7 +573,10 @@ func solar(c Config, s Schedule, day time.Time) (time.Time, error) {
 	}
 	v := strings.TrimSpace(string(out))
 	if !validTime(v, false) {
-		return time.Time{}, errors.New("solar event does not occur")
+		if strings.HasPrefix(v, "--:--") {
+			return time.Time{}, errNoSolarEvent
+		}
+		return time.Time{}, errors.New("invalid sunwait response")
 	}
 	utcDay := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
 	t := clockOn(utcDay, v).In(day.Location())
@@ -593,7 +597,7 @@ func (s *Server) eventTime(rule Schedule, day time.Time) (time.Time, error) {
 	} else {
 		t, e = s.solar(rule, day)
 		if e != nil {
-			if rule.Fallback == "" {
+			if rule.Fallback == "" || !errors.Is(e, errNoSolarEvent) {
 				return t, e
 			}
 			t = clockOn(day, rule.Fallback)

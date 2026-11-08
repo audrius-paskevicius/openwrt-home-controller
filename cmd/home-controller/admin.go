@@ -59,7 +59,7 @@ func rpc() error {
 		readJSON(base+"/credential.json", &cred)
 		var access any
 		readJSON(run+"/access.json", &access)
-		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait")})
+		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": controllers(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
 	case "save":
 		var args struct {
 			Config string `json:"config"`
@@ -138,6 +138,26 @@ func restart() {
 	cmd.Start()
 }
 func exists(p string) bool { _, e := os.Stat(p); return e == nil }
+
+func controllers() []map[string]string {
+	out := []map[string]string{}
+	paths, _ := filepath.Glob("/sys/bus/usb/devices/*")
+	for _, p := range paths {
+		read := func(name string) string {
+			b, _ := os.ReadFile(filepath.Join(p, name))
+			return strings.TrimSpace(string(b))
+		}
+		if read("idVendor") != "1781" {
+			continue
+		}
+		pid := read("idProduct")
+		if pid != "0c30" && pid != "0c31" {
+			continue
+		}
+		out = append(out, map[string]string{"serial": read("serial"), "product": read("product"), "bus": read("busnum"), "device": read("devnum")})
+	}
+	return out
+}
 
 type iface struct {
 	Interface string `json:"interface"`
@@ -268,6 +288,21 @@ func configure() error {
 	if e != nil {
 		return e
 	}
+	if u, e := user.Lookup("homecontroller"); e == nil {
+		gid, _ := strconv.Atoi(u.Gid)
+		for _, usb := range controllers() {
+			if c.Controller != "" && usb["serial"] != c.Controller {
+				continue
+			}
+			bus, _ := strconv.Atoi(usb["bus"])
+			dev, _ := strconv.Atoi(usb["device"])
+			if bus > 0 && dev > 0 {
+				p := fmt.Sprintf("/dev/bus/usb/%03d/%03d", bus, dev)
+				os.Chown(p, 0, gid)
+				os.Chmod(p, 0660)
+			}
+		}
+	}
 	for _, dir := range []string{base + "/state", run} {
 		os.MkdirAll(dir, 0700)
 		own(dir)
@@ -302,10 +337,10 @@ func configure() error {
 	var radio strings.Builder
 	radio.WriteString("# Managed by Home Controller\nuser = \"homecontroller\"\ngroup = \"homecontroller\"\n")
 	if c.Controller != "" {
-		fmt.Fprintf(&radio, "controller { id = 1; type = 1; serial = %q; }\n", c.Controller)
+		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", c.Controller)
 	}
 	for _, d := range c.Devices {
-		fmt.Fprintf(&radio, "device { id = %d; name = %q; protocol = \"hasta\"; model = \"selflearningv2\"; controller = 1; parameters { house = %d; unit = %d; } }\n", d.RadioID, d.ID, d.House, d.Unit)
+		fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"hasta\"\n model = \"selflearningv2\"\n controller = 1\n parameters {\n house = %d\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.House, d.Unit)
 	}
 	if e = os.WriteFile("/etc/tellstick.conf", []byte(radio.String()), 0600); e != nil {
 		return e

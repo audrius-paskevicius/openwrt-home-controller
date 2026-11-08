@@ -22,6 +22,7 @@ return view.extend({
  const zone=field('Time zone (router = follow router setting)',c.timezone),lat=field('Latitude',c.latitude,'number'),lon=field('Longitude',c.longitude,'number'),days=field('Remember household sessions for days',c.session_days,'number');lat.input.step=lon.input.step='any';
  [enabled,port,networks,serial,zone,lat,lon,days].forEach(x=>general.append(x.node));
  general.append(E('p',{},data.sunwait?'Sunwait is available.':'Solar schedules need the optional sunwait package.'));
+ if(data.controllers)general.append(E('p',{},'Detected controllers: '+data.controllers.map(x=>x.product+' ('+x.serial+')').join(', ')));
  if(data.access)general.append(E('pre',{},JSON.stringify(data.access,null,2)));
  const split=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
  const tables={};

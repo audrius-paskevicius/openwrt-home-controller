@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -136,6 +137,21 @@ func TestSolarBounds(t *testing.T) {
 	at, e := s.eventTime(r, day)
 	if e != nil || at.Format("15:04") != "07:30" {
 		t.Fatal(at, e)
+	}
+}
+
+func TestSolarFallback(t *testing.T) {
+	s := testServer()
+	day := time.Now()
+	r := Schedule{Event: "sunrise", Fallback: "08:00"}
+	s.solar = func(Schedule, time.Time) (time.Time, error) { return time.Time{}, errNoSolarEvent }
+	at, e := s.eventTime(r, day)
+	if e != nil || at.Format("15:04") != "08:00" {
+		t.Fatal(at, e)
+	}
+	s.solar = func(Schedule, time.Time) (time.Time, error) { return time.Time{}, errors.New("sunwait unavailable") }
+	if _, e = s.eventTime(r, day); e == nil {
+		t.Fatal("technical error must not become a solar fallback")
 	}
 }
 func TestDST(t *testing.T) {
