@@ -32,7 +32,7 @@ The SDK uses a temporary key, so allow that input only during re-signing:
 
 ```
 apk.static adbsign --allow-untrusted --reset-signatures --sign-key /private/home-controller-signing.pem dist/telldus-core-2.1.3_beta1-r10.apk
-apk verify dist/luci-app-home-controller-0.1.0-r1.apk dist/telldus-core-2.1.3_beta1-r10.apk
+apk verify "dist/luci-app-home-controller-$(cat VERSION).apk" dist/telldus-core-2.1.3_beta1-r10.apk
 ```
 
 Verification and installation must use the trusted public key, without

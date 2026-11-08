@@ -1,5 +1,13 @@
 # Release verification
 
+Version 0.1.1 adds automatic TellStick selection. All 15 application tests passed
+on the router, including replacement of a disconnected controller, stable selection
+with several controllers, and migration of old serial settings. The installed
+service selected the attached TellStick automatically. The actual LuCI view was
+rendered with zero, one and multiple devices: no serial input is shown, and multiple
+devices produce a read-only identification of the one in use. Multiple-device and
+replacement cases were simulated; this update did not require radio transmissions.
+
 Version 0.1.0 was exercised on an OpenWrt 25.12.6 mvebu/cortexa9 ARMv7 router with
 an original USB TellStick. A separate TellStick Duo, attached to an unchanged FHEM
 host, received the radio trials. No household identifiers or raw private captures
