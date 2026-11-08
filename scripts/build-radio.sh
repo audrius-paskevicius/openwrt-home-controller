@@ -7,8 +7,7 @@ BASE=https://downloads.openwrt.org/releases/$SDK_VERSION/targets/mvebu/cortexa9
 mkdir -p build dist
 cd build
 python3 "$ROOT/scripts/download-sdk.py" "$BASE/$SDK_NAME.tar.zst" sdk.tar.zst
-curl -fL --connect-timeout 20 --max-time 120 --retry 3 "$BASE/sha256sums" -o sums
-grep " $SDK_NAME.tar.zst\$" sums | sed "s|$SDK_NAME.tar.zst|sdk.tar.zst|" | sha256sum -c -
+printf '%s  sdk.tar.zst\n' fc59dddc696b88e32662f4b1611c880bed24a88115ae423b640c81d071bec8ab | sha256sum -c -
 tar --zstd -xf sdk.tar.zst
 cd "$SDK_NAME"
 ./scripts/feeds update packages
@@ -23,3 +22,5 @@ find bin -name 'telldus-core*.apk' -exec cp {} "$ROOT/dist/" \;
 CC=$(find staging_dir/toolchain-* -path '*/bin/*-gcc' | head -1)
 export STAGING_DIR="$PWD/staging_dir"
 "$CC" -Os -s "$ROOT/src/radio.c" -ldl -o "$ROOT/dist/home-controller-radio"
+LINK=$(find build_dir -path '*/telldus*/service/CMakeFiles/telldusd.dir/link.txt' | head -1)
+python3 "$ROOT/scripts/build-radio-test.py" "$LINK" "$ROOT"

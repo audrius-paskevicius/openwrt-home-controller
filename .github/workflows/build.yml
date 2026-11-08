@@ -24,8 +24,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
-          path: build/sdk.tar.zst
-          key: sdk-25.12.6-mvebu-cortexa9
+          path: |
+            build/sdk.tar.zst
+            build/sdk-parts
+          key: sdk-25.12.6-mvebu-cortexa9-ranges
       - run: bash scripts/build-radio.sh
       - uses: actions/cache/save@v4
         if: always()
