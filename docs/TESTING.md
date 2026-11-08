@@ -1,5 +1,12 @@
 # Release verification
 
+Version 0.2.3 adds a permanent disclaimer tab matching Wi-Fi Coordinator's warning
+label, amber notice, and emphasized closing paragraph. Live native LuCI checks
+verified the canonical text, removal of General's Read warning button, and the
+Save bar hiding on the disclaimer and returning on settings tabs, including after
+page reload. Existing acknowledgement tests and form-handler checks passed. The
+signed package upgrade preserved configuration, credentials and Scheduler state.
+
 Version 0.2.2 uses native LuCI form maps, sortable grid sections, modal editors and
 the standard view action bar. Synthetic RPC checks in the router's actual LuCI
 runtime verify local editor changes, disabled new schedules, draft Save, Apply,
