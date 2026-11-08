@@ -10,7 +10,7 @@ if hashlib.sha256(data).hexdigest() != digest:
 s = s.replace('PKG_VERSION:=2.1.2', 'PKG_VERSION:=2.1.3_beta1')
 s = s.replace('PKG_RELEASE:=9', 'PKG_RELEASE:=10')
 s = s.replace('PKG_NAME:=telldus-core', 'PKG_NAME:=telldus-core\nPKG_USE_NINJA:=0')
-s = s.replace('PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz', 'PKG_SOURCE:=telldus-2.1.3-beta1.tar.gz\nPKG_UNPACK:=$(HOST_TAR) -xzf $(DL_DIR)/$(PKG_SOURCE) --strip-components=2 -C $(PKG_BUILD_DIR) telldus-2.1.3-beta1/telldus-core')
+s = s.replace('PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz', 'PKG_SOURCE:=telldus-2.1.3-beta1.tar.gz\nPKG_UNPACK = tar -xzf $(DL_DIR)/$(PKG_SOURCE) --strip-components=2 -C $(PKG_BUILD_DIR) telldus-2.1.3-beta1/telldus-core')
 s = s.replace('PKG_SOURCE_URL:=http://download.telldus.com/TellStick/Software/telldus-core/', 'PKG_SOURCE_URL:=' + url + '?')
 import re
 s = re.sub(r'PKG_HASH:=.*', 'PKG_HASH:=' + digest, s)
