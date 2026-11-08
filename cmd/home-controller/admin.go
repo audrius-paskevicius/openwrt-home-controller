@@ -68,7 +68,8 @@ func rpc() error {
 		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": controllers(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
 	case "save":
 		var args struct {
-			Config string `json:"config"`
+			Config     string `json:"config"`
+			RPCSession string `json:"ubus_rpc_session"`
 		}
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
@@ -91,8 +92,9 @@ func rpc() error {
 		respond(map[string]bool{"ok": true})
 	case "password":
 		var args struct {
-			User     string `json:"user"`
-			Password string `json:"password"`
+			User       string `json:"user"`
+			Password   string `json:"password"`
+			RPCSession string `json:"ubus_rpc_session"`
 		}
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
