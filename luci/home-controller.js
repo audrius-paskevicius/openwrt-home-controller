@@ -7,6 +7,7 @@ const save = rpc.declare({object:'home-controller',method:'save',params:['config
 const password = rpc.declare({object:'home-controller',method:'password',params:['user','password'],expect:{}});
 const revoke = rpc.declare({object:'home-controller',method:'revoke',expect:{}});
 const sessions = rpc.declare({object:'home-controller',method:'sessions',expect:{}});
+const tls = rpc.declare({object:'home-controller',method:'tls',expect:{}});
 function result(r){if(r.error)throw new Error(r.error);return r;}
 function field(label,value,type){const input=E('input',{class:'cbi-input-text',type:type||'text',value:value==null?'':String(value)});return {input,node:E('label',{style:'display:block;margin:10px 0'},[E('span',{style:'display:block;font-weight:600'},label),input])};}
 function select(label,value,choices){const input=E('select',{class:'cbi-input-select'},choices.map(x=>E('option',{value:x[0]},x[1])));input.value=value;return {input,node:E('label',{style:'display:block;margin:10px 0'},[E('span',{style:'display:block;font-weight:600'},label),input])};}
@@ -24,6 +25,7 @@ return view.extend({
  general.append(E('p',{},data.sunwait?'Sunwait is available.':'Solar schedules need the optional sunwait package.'));
  if(data.controllers)general.append(E('p',{},'Detected controllers: '+data.controllers.map(x=>x.product+' ('+x.serial+')').join(', ')));
  if(data.access)general.append(E('pre',{},JSON.stringify(data.access,null,2)));
+ general.append(E('button',{class:'cbi-button',click:async()=>{try{result(await tls());ui.addNotification(null,E('p',{},'Router HTTPS certificate copied. Home Controller is restarting.'),'info');}catch(e){notice(e);}}},'Refresh HTTPS certificate from router'));
  const split=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
  const tables={};
  function editor(key,title,columns,defaults){const section=E('div',{class:'cbi-section'},[E('h3',{},title)]),rows=E('div');tables[key]=[];

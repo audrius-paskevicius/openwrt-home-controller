@@ -38,7 +38,7 @@ func rpc() error {
 		return errors.New("administrator required")
 	}
 	if len(os.Args) > 2 && os.Args[2] == "list" {
-		fmt.Print(`{"get":{},"save":{"config":""},"password":{"user":"","password":""},"revoke":{},"sessions":{}}`)
+		fmt.Print(`{"get":{},"save":{"config":""},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
 		return nil
 	}
 	if len(os.Args) < 4 {
@@ -48,6 +48,37 @@ func rpc() error {
 	respond := func(v any) { json.NewEncoder(os.Stdout).Encode(v) }
 	errResult := func(e error) error { respond(map[string]string{"error": e.Error()}); return nil }
 	switch method {
+	case "tls":
+		for _, item := range []struct{ option, name string }{{"cert", "tls.crt"}, {"key", "tls.key"}} {
+			p, e := exec.Command("/sbin/uci", "-q", "get", "uhttpd.main."+item.option).Output()
+			if e != nil {
+				return errResult(e)
+			}
+			b, e := os.ReadFile(strings.TrimSpace(string(p)))
+			if e != nil {
+				return errResult(e)
+			}
+			if len(b) == 0 || len(b) > 1048576 {
+				return errResult(errors.New("invalid certificate/key size"))
+			}
+			f, e := os.CreateTemp(base, ".tls-")
+			if e != nil {
+				return errResult(e)
+			}
+			temp := f.Name()
+			_, e = f.Write(b)
+			f.Close()
+			if e == nil {
+				e = os.Rename(temp, base+"/"+item.name)
+			}
+			os.Remove(temp)
+			if e != nil {
+				return errResult(e)
+			}
+			own(base + "/" + item.name)
+		}
+		restart()
+		respond(map[string]bool{"ok": true})
 	case "get":
 		c, e := loadConfig()
 		if e != nil {

@@ -10,7 +10,7 @@ python3 "$ROOT/scripts/download-sdk.py" "$BASE/$SDK_NAME.tar.zst" sdk.tar.zst
 printf '%s  sdk.tar.zst\n' fc59dddc696b88e32662f4b1611c880bed24a88115ae423b640c81d071bec8ab | sha256sum -c -
 tar --zstd -xf sdk.tar.zst
 cd "$SDK_NAME"
-./scripts/feeds update packages
+./scripts/feeds update -a
 ./scripts/feeds install telldus-core
 P=feeds/packages/utils/telldus-core
 python3 "$ROOT/scripts/prepare-telldus.py" "$P"
