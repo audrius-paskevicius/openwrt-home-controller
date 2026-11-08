@@ -48,7 +48,8 @@ Network hotplug events refresh the service bindings.
 The controller and household web server run as `homecontroller`. Their configuration
 directory is root-owned; configuration and credential files are root-owned and group
 readable. Only session storage and the runtime directory are writable by the service.
-The HTTPS private key is readable by the dedicated web-server account, not published.
+The separate household HTTPS private key is root-owned and group-readable by the
+dedicated web server. LuCI's key and the router CA's key are never shared with it.
 Privileged application of network rules, service configuration and account changes
 is restricted to LuCI administration. The Telldus daemon is a separate upstream
 service; it requires access to the USB controller and has its own privilege model.

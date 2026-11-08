@@ -4,12 +4,6 @@
 group_id=$(group_add_next homecontroller)
 user_exists homecontroller || user_add homecontroller '' "$group_id" 'Home Controller' /var/run/home-controller /bin/false
 mkdir -p /etc/home-controller/state /var/run/home-controller
-if [ ! -f /etc/home-controller/tls.crt ]; then
- cert=$(uci -q get uhttpd.main.cert)
- key=$(uci -q get uhttpd.main.key)
- [ ! -r "$cert" ] || cp "$cert" /etc/home-controller/tls.crt
- [ ! -r "$key" ] || cp "$key" /etc/home-controller/tls.key
-fi
 chown root:homecontroller /etc/home-controller
 chmod 750 /etc/home-controller
 chown homecontroller:homecontroller /etc/home-controller/state /var/run/home-controller
@@ -20,8 +14,8 @@ if [ -f /etc/home-controller/credential.json ]; then
  chown root:homecontroller /etc/home-controller/credential.json
  chmod 640 /etc/home-controller/credential.json
 fi
-chown homecontroller:homecontroller /etc/home-controller/tls.* 2>/dev/null || true
-chmod 600 /etc/home-controller/tls.* 2>/dev/null || true
+chown root:homecontroller /etc/home-controller/tls.* 2>/dev/null || true
+chmod 640 /etc/home-controller/tls.* 2>/dev/null || true
 /etc/init.d/rpcd restart
 /etc/init.d/home-controller enable
 rm -f /tmp/luci-indexcache.*.json

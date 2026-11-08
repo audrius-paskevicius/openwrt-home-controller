@@ -18,11 +18,14 @@ driver/helper binaries on another architecture.
 6. Enable the service and save. Open `https://ROUTER-LAN-ADDRESS:8443/` (or your chosen
    port). Trust your router's certificate authority on household devices.
 
-The installer copies the existing uHTTPd certificate and private key into the
-service's protected directory. No new CA is installed in clients. The certificate
-must cover the hostname/address used for the control page. Connect through a VPN
-using the covered LAN hostname/address and a route to LAN. Router certificate renewal
-requires using **Refresh HTTPS certificate from router** in Home Controller's LuCI page.
+Home Controller creates its own HTTPS key. If the router has the `router-ca`
+Easy-RSA helper, it requests a separate certificate from that local CA; otherwise
+it creates a self-signed certificate that household devices must explicitly trust.
+It never copies LuCI's private key. Use **Renew household HTTPS certificate** in
+LuCI before the one-year certificate expires or after changing listener addresses.
+The certificate covers the router hostname and selected active addresses. Through
+a VPN, use a covered address or hostname. A custom certificate and key can also be
+installed by the administrator at `/etc/home-controller/tls.crt` and `tls.key`.
 
 The package owns `/etc/tellstick.conf` once enabled. Do not combine it with another
 application managing that file or the same USB transmitter. It does not modify any

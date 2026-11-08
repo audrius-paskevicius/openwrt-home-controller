@@ -25,7 +25,7 @@ return view.extend({
  general.append(E('p',{},data.sunwait?'Sunwait is available.':'Solar schedules need the optional sunwait package.'));
  if(data.controllers)general.append(E('p',{},'Detected controllers: '+data.controllers.map(x=>x.product+' ('+x.serial+')').join(', ')));
  if(data.access)general.append(E('pre',{},JSON.stringify(data.access,null,2)));
- general.append(E('button',{class:'cbi-button',click:async()=>{try{result(await tls());ui.addNotification(null,E('p',{},'Router HTTPS certificate copied. Home Controller is restarting.'),'info');}catch(e){notice(e);}}},'Refresh HTTPS certificate from router'));
+ general.append(E('button',{class:'cbi-button',click:async()=>{try{result(await tls());ui.addNotification(null,E('p',{},'Household HTTPS certificate renewed. Home Controller is restarting.'),'info');}catch(e){notice(e);}}},'Renew household HTTPS certificate'));
  const split=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
  const tables={};
  function editor(key,title,columns,defaults){const section=E('div',{class:'cbi-section'},[E('h3',{},title)]),rows=E('div');tables[key]=[];

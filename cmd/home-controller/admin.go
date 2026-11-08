@@ -49,33 +49,8 @@ func rpc() error {
 	errResult := func(e error) error { respond(map[string]string{"error": e.Error()}); return nil }
 	switch method {
 	case "tls":
-		for _, item := range []struct{ option, name string }{{"cert", "tls.crt"}, {"key", "tls.key"}} {
-			p, e := exec.Command("/sbin/uci", "-q", "get", "uhttpd.main."+item.option).Output()
-			if e != nil {
-				return errResult(e)
-			}
-			b, e := os.ReadFile(strings.TrimSpace(string(p)))
-			if e != nil {
-				return errResult(e)
-			}
-			if len(b) == 0 || len(b) > 1048576 {
-				return errResult(errors.New("invalid certificate/key size"))
-			}
-			f, e := os.CreateTemp(base, ".tls-")
-			if e != nil {
-				return errResult(e)
-			}
-			temp := f.Name()
-			_, e = f.Write(b)
-			f.Close()
-			if e == nil {
-				e = os.Rename(temp, base+"/"+item.name)
-			}
-			os.Remove(temp)
-			if e != nil {
-				return errResult(e)
-			}
-			own(base + "/" + item.name)
+		if e := renewTLS(); e != nil {
+			return errResult(e)
 		}
 		restart()
 		respond(map[string]bool{"ok": true})
@@ -377,12 +352,16 @@ func configure() error {
 		return e
 	}
 	adminFile("/etc/tellstick.conf")
+	if !exists(base+"/tls.crt") || !exists(base+"/tls.key") {
+		if e := renewTLS(); e != nil {
+			return e
+		}
+	}
 	for _, p := range []string{base + "/tls.crt", base + "/tls.key"} {
 		if !exists(p) {
 			return errors.New("configure TLS certificate and key before enabling")
 		}
-		os.Chmod(p, 0600)
-		own(p)
+		adminFile(p)
 	}
 	// Generate a shell argument file with validated addresses and fixed options only.
 	lines := []string{}
