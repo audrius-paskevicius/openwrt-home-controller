@@ -10,6 +10,8 @@ On a Linux build host with Go, GCC build prerequisites, curl, tar and zstd:
 
 ```
 go test -race ./...
+node tests/check-js.cjs
+node tests/account-ui.cjs
 mkdir -p dist
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/home-controller ./cmd/home-controller
 bash scripts/build-radio.sh
@@ -40,6 +42,12 @@ Verification and installation must use the trusted public key, without
 produces the patched corresponding-source archive and the `hasta-test` executable;
 run that test on the target (it calculates packets without transmitting).
 The public verification key belongs in `/etc/apk/keys/` on the target.
+
+`node tests/browser-ui.cjs` exercises both interfaces in a disposable headless Chrome
+listening on localhost:9222 (Node 24 or later). It injects synthetic API/RPC responses
+and never contacts a router or sends radio commands. It checks mobile layouts,
+control ordering, scheduler interaction, editors and inline save/error feedback.
+Set `UI_SCREENSHOTS=1` to save household screenshots under ignored `.private/`.
 
 `.private/` holds local deployment settings and test evidence; `.tools/` holds local
 development tools. Both are excluded from Git. Do not publish them, browser profiles,

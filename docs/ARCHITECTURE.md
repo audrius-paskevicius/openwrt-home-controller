@@ -3,7 +3,7 @@
 The household site and LuCI are different applications. A dedicated uHTTPd instance
 serves Home Controller over HTTPS. It runs as `homecontroller`, with its own document
 root and no ubus or LuCI endpoint. Its CGI gateway forwards only login, logout, state,
-and device-command requests to a private Unix socket. The page response prohibits
+device-command and scheduler Start/Stop requests to a private Unix socket. The page response prohibits
 framing and uses a restrictive Content Security Policy.
 
 The Go controller uses the standard library; no Go modules are downloaded. The Go
@@ -47,7 +47,7 @@ Network hotplug events refresh the service bindings.
 
 The controller and household web server run as `homecontroller`. Their configuration
 directory is root-owned; configuration and credential files are root-owned and group
-readable. Only session storage and the runtime directory are writable by the service.
+readable. Only session/scheduler state storage and the runtime directory are writable by the service.
 The separate household HTTPS private key is root-owned and group-readable by the
 dedicated web server. LuCI's key and the router CA's key are never shared with it.
 Privileged application of network rules, service configuration and account changes
@@ -55,7 +55,8 @@ is restricted to LuCI administration. The Telldus daemon is a separate upstream
 service; it requires access to the USB controller and has its own privilege model.
 
 The queue, last command states and last 100 results are in RAM. Sessions are written
-only when their membership changes. No continuous history is written to flash.
+only when their membership changes. The scheduler's stopped preference is written
+when Start/Stop changes it. No continuous history is written to flash.
 Unknown device position is explicit: a successful send is not a position measurement.
 
 ## Commands and schedules
@@ -73,6 +74,15 @@ converted using the selected time zone. `router` follows OpenWrt's zone name. A 
 offset is applied before optional earliest/latest bounds. Missing solar events are
 skipped unless a fallback time is set. Fixed-time schedules do not require sunwait.
 
-MQTT is not included in version 0.1. The controller queue is the intended integration
+Household Scheduler Stop persists before taking effect, cancels waiting scheduled
+commands and prevents future scheduled sends. Manual commands remain available.
+It cannot interrupt an in-flight radio call and does not send Stop to the blinds.
+Start clips the evaluation interval to its resume time, avoiding missed-event replay.
+The preference survives service restart/reboot; unreadable state leaves scheduling
+stopped. Schedule definitions and individual enable flags remain administrator-only.
+The next-event preview uses the same time-zone, solar and time-bound calculation as
+execution. A runtime snapshot is refreshed every five seconds for LuCI status.
+
+MQTT is not included. The controller queue is the intended integration
 point for a future optional adapter, so that MQTT cannot bypass validation, ordering
 or expiry. No broker or MQTT listener is installed by this package.

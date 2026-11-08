@@ -1,5 +1,14 @@
 # Release verification
 
+Version 0.2.0 redesigns both interfaces and adds household scheduler control.
+Automated tests cover persistent Stop/Start, cancellation of waiting scheduled
+commands while retaining manual commands, no missed-event replay, next weekly
+event calculation, authentication/CSRF checks and failure to save scheduler state.
+Browser tests use synthetic API/RPC responses to verify household ordering,
+vertical touch controls and no horizontal overflow at 320/390/1024 pixels, scheduler
+success/error feedback, LuCI tabs, generated device IDs, repeated editor saves,
+schedule defaults and inline enable/error feedback. These tests do not transmit RF.
+
 Version 0.1.2 removes the minimum household-password length. Validation accepts
 short non-empty passwords, rejects empty/overlong values, and counts Unicode
 characters consistently. The LuCI handler test exercises inline saving, success,

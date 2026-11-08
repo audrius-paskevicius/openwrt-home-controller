@@ -12,11 +12,13 @@ LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
 - Weekly schedules and optional `sunwait` sunrise, sunset, civil dawn and dusk events.
 - Solar offsets, time bounds, and optional fallback when a solar event does not occur.
 - Manual commands leave future schedules active; missed events are skipped.
+- Household Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
+- Tabbed LuCI administration with device/group editors and guided schedule controls.
 - Unprivileged household services, independent HTTPS key, and no cloud dependency.
 - Patched Telldus driver preserving Hasta selflearningv2 unit-zero support.
 
 The initial binary release targets **OpenWrt 25.12, ARMv7 mvebu/cortexa9**. Other
-architectures require rebuilding. MQTT is a future extension, not a v0.1 dependency.
+architectures require rebuilding. MQTT is a future extension, not a dependency.
 
 Read the [disclaimer](DISCLAIMER.txt), then the [installation guide](docs/INSTALL.md).
 See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), and

@@ -77,7 +77,7 @@ func rpc() error {
 		if !c.Enabled || !connected {
 			active = nil
 		}
-		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "time_utc": time.Now().UTC().Format(time.RFC3339)})
+		respond(map[string]any{"config": c, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "networks": availableNetworks(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
 	case "save":
 		var args struct {
 			Config     string `json:"config"`
@@ -204,6 +204,32 @@ type iface struct {
 	IPv6 []struct {
 		Address string `json:"address"`
 	} `json:"ipv6-address"`
+}
+
+func availableNetworks() []string {
+	out := []string{}
+	raw, err := exec.Command("/bin/ubus", "call", "network.interface", "dump").Output()
+	if err != nil {
+		return out
+	}
+	var data struct {
+		Interface []iface `json:"interface"`
+	}
+	if json.Unmarshal(raw, &data) != nil {
+		return out
+	}
+	denied := map[string]bool{}
+	for _, i := range data.Interface {
+		if i.Interface == "wan" || i.Interface == "wan6" {
+			denied[i.Device] = true
+		}
+	}
+	for _, i := range data.Interface {
+		if i.Interface != "wan" && i.Interface != "wan6" && i.Device != "lo" && !denied[i.Device] && idRE.MatchString(i.Interface) {
+			out = append(out, i.Interface)
+		}
+	}
+	return out
 }
 
 func networkAccess(c Config) ([]string, []string, error) {

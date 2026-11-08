@@ -9,22 +9,25 @@ driver/helper binaries on another architecture.
    key in `/etc/apk/keys/home-controller-public.pem`.
 2. Install the patched Telldus APK and the Home Controller APK with `apk add`.
    Install `sunwait` through OpenWrt's package manager for solar schedules.
-3. Open **Services → Home Controller** in LuCI. Set a separate household username and
+3. Open **Services → Home Controller → Household access** in LuCI. Set a separate household username and
    password. Any non-empty password up to 256 characters is accepted. Click **Set
    household password**; its result appears beside the button. No default household
    password is shipped.
-4. Connect a TellStick, enter your devices and optional groups, and configure allowed
-   LAN/VPN logical networks. TellStick selection is automatic.
-5. Set coordinates for your location. Keep time zone `router` to follow OpenWrt's
+4. Connect a TellStick and add devices and optional groups in **Devices & groups**.
+   Internal IDs are generated automatically. TellStick selection is automatic.
+   LAN and detected VPN tunnels are selected by default; overrides are in **Advanced**.
+5. Under **Schedules → Location and time zone**, set coordinates for solar events.
+   Keep **Follow router automatically** to follow OpenWrt's
    time-zone setting. Ensure the router's date/time and NTP setup are correct.
-6. Enable the service and save. Open `https://ROUTER-LAN-ADDRESS:8443/` (or your chosen
+6. Under **Advanced**, enable the service and apply. **Overview** shows status and a
+   household-page link. Open `https://ROUTER-LAN-ADDRESS:8443/` (or your chosen
    port). Trust your router's certificate authority on household devices.
 
 Home Controller creates its own HTTPS key. If the router has the `router-ca`
 Easy-RSA helper, it requests a separate certificate from that local CA; otherwise
 it creates a self-signed certificate that household devices must explicitly trust.
-It never copies LuCI's private key. Use **Renew household HTTPS certificate** in
-LuCI before the one-year certificate expires or after changing listener addresses.
+It never copies LuCI's private key. Use **Advanced → HTTPS certificate → Renew certificate**
+before the one-year certificate expires or after changing listener addresses.
 The certificate covers the router hostname and selected active addresses. Through
 a VPN, use a covered address or hostname. A custom certificate and key can also be
 installed by the administrator at `/etc/home-controller/tls.crt` and `tls.key`.
@@ -36,10 +39,20 @@ private configuration, never public examples or release defaults.
 
 ## Daily use
 
-The household page has individual and group Up/Stop/Down buttons. A remembered login
+The household page shows individual devices first, then groups, then Scheduler.
+Up/Stop/Down buttons are stacked vertically with a small status line for each control.
+The small Sign out link is at the bottom. A remembered login
 lasts for the administrator-selected number of days. Sign out ends that session;
 LuCI can revoke all sessions or change the household account. Management is available
 only through LuCI. Manual commands do not pause or disable later schedules.
+
+The Scheduler card shows Running/Stopped and the next event in the configured router
+or custom time zone. **Stop** cancels waiting scheduled commands and prevents future
+scheduled sends, while manual controls remain available. It does **not** stop moving
+blinds or interrupt a radio command already in flight; use the device/group Stop
+buttons for that. **Start** resumes future events without replaying missed ones.
+The stopped state survives service restarts and router reboots. Individual schedule
+enable flags stay unchanged; edit them in LuCI.
 
 "Sent" means the Telldus API reported successful transmission. It does not prove
 movement or the current position. Groups send one command per blind, sequentially.
@@ -48,7 +61,9 @@ being transmitted. A radio timeout can delay the next command up to its timeout.
 
 ## Schedules
 
-Choose weekdays, a device/group, an action, and a fixed time or solar event. Solar
+In the **Schedules** tab, add or edit a schedule using weekday checkboxes, device/group
+and action dropdowns, and a time picker or solar event. New schedules start disabled
+until explicitly enabled. Solar
 offsets are minutes before/after the event. Earliest/latest bounds clamp the computed
 time. A missing polar solar event is skipped unless a fallback time is configured.
 Technical calculation failures are skipped, not treated as polar fallback events.

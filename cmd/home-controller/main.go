@@ -107,17 +107,22 @@ type Event struct {
 	Result string `json:"result"`
 }
 type Server struct {
-	mu       sync.Mutex
-	config   Config
-	cred     Credential
-	sessions []Session
-	states   map[string]DeviceState
-	history  []Event
-	queue    []Command
-	wake     chan bool
-	attempts map[string][]time.Time
-	sender   func(Command) error
-	solar    func(Schedule, time.Time) (time.Time, error)
+	mu               sync.Mutex
+	config           Config
+	cred             Credential
+	sessions         []Session
+	states           map[string]DeviceState
+	history          []Event
+	queue            []Command
+	wake             chan bool
+	attempts         map[string][]time.Time
+	sender           func(Command) error
+	solar            func(Schedule, time.Time) (time.Time, error)
+	schedulerFile    string
+	schedulerStopped bool
+	resumeAt         time.Time
+	previewAt        time.Time
+	preview          *NextAction
 }
 
 func readJSON(path string, v any) error {
@@ -438,7 +443,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, d := range s.config.Devices {
 			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "state": s.states[d.ID]})
 		}
-		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false})
+		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now())})
+	case "/api/scheduler":
+		if r.Method != "POST" {
+			fail(w, 405, "POST required")
+			return
+		}
+		var v struct {
+			Action string `json:"action"`
+		}
+		if decode(r.Body, &v) != nil || (v.Action != "start" && v.Action != "stop") {
+			fail(w, 400, "choose start or stop")
+			return
+		}
+		if e := s.setScheduler(v.Action == "stop", time.Now()); e != nil {
+			fail(w, 500, "could not save scheduler state")
+			return
+		}
+		answer(w, 200, s.schedulerStatus(time.Now()))
 	case "/api/command":
 		if r.Method != "POST" {
 			fail(w, 405, "POST required")
@@ -554,7 +576,7 @@ func (s *Server) worker() {
 			if len(s.history) > 100 {
 				s.history = s.history[len(s.history)-100:]
 			}
-			atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "history": s.history, "queue": len(s.queue)})
+			s.writeStatus(time.Now())
 			s.mu.Unlock()
 		}
 	}
@@ -634,6 +656,12 @@ func (s *Server) eventTime(rule Schedule, day time.Time) (time.Time, error) {
 	return t, nil
 }
 func (s *Server) due(last, now time.Time, seen map[string]bool) {
+	if s.schedulerStopped {
+		return
+	}
+	if s.resumeAt.After(last) {
+		last = s.resumeAt
+	}
 	if now.Before(last) || now.Sub(last) > 90*time.Second {
 		return
 	}
@@ -676,6 +704,7 @@ func (s *Server) scheduler() {
 		}
 		s.mu.Lock()
 		s.due(last, now, seen)
+		s.writeStatus(now)
 		s.mu.Unlock()
 		last = now
 		if len(seen) > 1024 {
@@ -697,6 +726,11 @@ func serve() error {
 		}
 	}
 	s := &Server{config: c, states: map[string]DeviceState{}, wake: make(chan bool, 1), attempts: map[string][]time.Time{}}
+	s.schedulerFile = base + "/state/scheduler.json"
+	if e := s.loadScheduler(); e != nil {
+		s.schedulerStopped = true
+		log.Print("scheduler state unreadable; scheduler stopped")
+	}
 	readJSON(base+"/credential.json", &s.cred)
 	readJSON(base+"/state/sessions.json", &s.sessions)
 	s.sender = s.send
@@ -710,7 +744,7 @@ func serve() error {
 		if v, ok := cache[key]; ok {
 			return v.at, v.err
 		}
-		if len(cache) > 32 {
+		if len(cache) > 128 {
 			cache = map[string]solarResult{}
 		}
 		at, e := solar(c, r, d)
@@ -724,7 +758,7 @@ func serve() error {
 		return e
 	}
 	os.Chmod(run+"/api.sock", 0600)
-	if e := atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "history": []Event{}, "queue": 0}); e != nil {
+	if e := atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "history": []Event{}, "queue": 0, "scheduler": s.schedulerStatus(time.Now())}); e != nil {
 		ln.Close()
 		return e
 	}
@@ -747,7 +781,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		w.Write(b)
 		return
 	}
-	if !map[string]bool{"/api/login": true, "/api/logout": true, "/api/state": true, "/api/command": true}[r.URL.Path] {
+	if !map[string]bool{"/api/login": true, "/api/logout": true, "/api/state": true, "/api/command": true, "/api/scheduler": true}[r.URL.Path] {
 		fail(w, 404, "not found")
 		return
 	}

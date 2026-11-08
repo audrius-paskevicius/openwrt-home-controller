@@ -19,8 +19,9 @@ cp web/* "$ROOT/usr/share/home-controller/www/"
 mv "$ROOT/usr/share/home-controller/www/index.html" "$ROOT/usr/share/home-controller/page.html"
 printf '<!doctype html><meta http-equiv="refresh" content="0;url=/api/page"><title>Home Controller</title><a href="/api/page">Open Home Controller</a>\n' > "$ROOT/usr/share/home-controller/www/index.html"
 cp DISCLAIMER.txt "$ROOT/usr/share/home-controller/www/disclaimer.txt"
-for op in login logout state command page; do printf '#!/bin/sh\nexec /usr/bin/home-controller\n' > "$ROOT/usr/share/home-controller/www/api/$op"; done
+for op in login logout state command page scheduler; do printf '#!/bin/sh\nexec /usr/bin/home-controller\n' > "$ROOT/usr/share/home-controller/www/api/$op"; done
 cp luci/home-controller.js "$ROOT/www/luci-static/resources/view/"
+cp luci/home-controller.css "$ROOT/www/luci-static/resources/"
 cp files/menu.json "$ROOT/usr/share/luci/menu.d/luci-app-home-controller.json"
 cp files/acl.json "$ROOT/usr/share/rpcd/acl.d/luci-app-home-controller.json"
 printf '/etc/home-controller/\n/etc/tellstick.conf\n' > "$ROOT/lib/upgrade/keep.d/home-controller"

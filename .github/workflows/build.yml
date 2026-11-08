@@ -18,6 +18,18 @@ jobs:
           node tests/account-ui.cjs
           sh -n scripts/build-apk.sh
           sh -n files/home-controller.init
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: |
+          google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="$RUNNER_TEMP/home-controller-chrome" about:blank > "$RUNNER_TEMP/chrome.log" 2>&1 &
+          chrome_pid=$!
+          trap 'kill "$chrome_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9222/json/version > /dev/null; then break; fi
+            sleep 1
+          done
+          node tests/browser-ui.cjs
       - run: |
           mkdir -p dist
           GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/home-controller ./cmd/home-controller

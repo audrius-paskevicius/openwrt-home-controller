@@ -6,9 +6,13 @@ class Element {
  constructor(tag, attrs = {}, children = []) {
   this.tag = tag; this.attrs = attrs; this.children = []; this.style = {};
   this.value = attrs.value || ''; this.disabled = false; this.events = {};
+  this.classList = {toggle:()=>{}};
   this.append(...(Array.isArray(children) ? children : [children]));
  }
  append(...children) { this.children.push(...children); }
+ replaceChildren(...children) { this.children = children; }
+ setAttribute(key, value) { this.attrs[key] = value; }
+ get firstChild() { return this.children[0]; }
  get textContent() { return this.children.map(c => typeof c === 'string' ? c : c.textContent).join(''); }
  set textContent(text) { this.children = [text]; }
  addEventListener(name, handler) { this.events[name] = handler; }
@@ -21,9 +25,9 @@ function descendants(e) { return [e, ...e.children.filter(c => c instanceof Elem
  const calls = [];
  let respond = () => Promise.resolve({ok:true});
  const rpc = {declare: spec => (...args) => { calls.push({method:spec.method,args}); return respond(); }};
- const view = new Function('view', 'rpc', 'ui', 'E', fs.readFileSync('luci/home-controller.js','utf8'))(
+ const view = new Function('view', 'rpc', 'ui', 'E', 'poll', fs.readFileSync('luci/home-controller.js','utf8'))(
   {extend:x=>x}, rpc, {addNotification:()=>assert.fail('Account feedback must be inline')},
-  (tag, attrs, children) => new Element(tag, attrs, children));
+  (tag, attrs, children) => new Element(tag, attrs, children), {add:()=>{}});
  const root = view.render({config:JSON.parse(fs.readFileSync('files/config.json')), account:'household', controllers:[]});
  const account = descendants(root).find(e=>e.tag==='div' && e.children[0]?.textContent==='Household account');
  const nodes = descendants(account), inputs = nodes.filter(e=>e.tag==='input');
