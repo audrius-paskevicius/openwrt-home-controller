@@ -108,8 +108,8 @@ func rpc() error {
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
 		}
-		if !idRE.MatchString(args.User) || len(args.Password) < 12 || len(args.Password) > 256 {
-			return errResult(errors.New("username: lowercase letters/numbers; password: 12..256 characters"))
+		if e := validateHouseholdAccount(args.User, args.Password); e != nil {
+			return errResult(e)
 		}
 		c := Credential{User: args.User, Salt: token(), Revision: token()}
 		c.Hash = passwordHash(args.Password, c.Salt)

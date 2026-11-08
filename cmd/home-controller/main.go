@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 	_ "time/tzdata"
+	"unicode/utf8"
 )
 
 const base = "/etc/home-controller"
@@ -177,6 +178,19 @@ func passwordHash(password, salt string) string {
 		}
 	}
 	return hex.EncodeToString(out)
+}
+
+func validateHouseholdAccount(user, password string) error {
+	if !idRE.MatchString(user) {
+		return errors.New("username must start with a lowercase letter and contain only lowercase letters, numbers, hyphens or underscores (up to 32 characters)")
+	}
+	if password == "" {
+		return errors.New("enter a new password")
+	}
+	if utf8.RuneCountInString(password) > 256 {
+		return errors.New("password must be at most 256 characters")
+	}
+	return nil
 }
 func validAction(s string) bool { return s == "up" || s == "stop" || s == "down" }
 func validTime(s string, optional bool) bool {
@@ -366,7 +380,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Password string `json:"password"`
 			Remember bool   `json:"remember"`
 		}
-		if decode(r.Body, &v) != nil || len(v.Password) > 256 {
+		if decode(r.Body, &v) != nil || utf8.RuneCountInString(v.Password) > 256 {
 			fail(w, 400, "invalid login")
 			return
 		}

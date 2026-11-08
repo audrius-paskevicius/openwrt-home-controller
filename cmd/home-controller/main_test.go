@@ -65,6 +65,25 @@ func TestPasswordKDF(t *testing.T) {
 		t.Fatal("KDF mismatch")
 	}
 }
+func TestHouseholdPasswordChoice(t *testing.T) {
+	for _, p := range []string{"x", "short", " å ", strings.Repeat("å", 256)} {
+		if err := validateHouseholdAccount("household", p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, p := range []string{"", strings.Repeat("x", 257), strings.Repeat("å", 257)} {
+		if validateHouseholdAccount("household", p) == nil {
+			t.Fatal("accepted empty or excessive password")
+		}
+	}
+	s := testServer()
+	s.cred = Credential{User: "household", Salt: "test-salt", Hash: passwordHash("short", "test-salt"), Revision: "test"}
+	// Exercise the real login handler without touching persistent session storage.
+	w := request(s, "POST", "/api/login", `{"user":"household","password":"wrong"}`, map[string]string{"Content-Type": "application/json"})
+	if w.Code != 401 {
+		t.Fatalf("incorrect password: %d", w.Code)
+	}
+}
 func TestConfigurationValidation(t *testing.T) {
 	c := exampleConfig()
 	if e := validate(c); e != nil {

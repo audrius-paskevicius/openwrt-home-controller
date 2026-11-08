@@ -15,6 +15,7 @@ jobs:
       - run: |
           python3 scripts/check-source.py
           node tests/check-js.cjs
+          node tests/account-ui.cjs
           sh -n scripts/build-apk.sh
           sh -n files/home-controller.init
       - run: |

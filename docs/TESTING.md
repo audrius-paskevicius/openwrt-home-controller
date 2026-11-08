@@ -1,5 +1,11 @@
 # Release verification
 
+Version 0.1.2 removes the minimum household-password length. Validation accepts
+short non-empty passwords, rejects empty/overlong values, and counts Unicode
+characters consistently. The LuCI handler test exercises inline saving, success,
+validation and server/network error messages, plus duplicate-click prevention.
+Tests use synthetic passwords; deployment preserves the existing household account.
+
 Version 0.1.1 adds automatic TellStick selection. All 15 application tests passed
 on the router, including replacement of a disconnected controller, stable selection
 with several controllers, and migration of old serial settings. The installed

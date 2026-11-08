@@ -10,7 +10,9 @@ driver/helper binaries on another architecture.
 2. Install the patched Telldus APK and the Home Controller APK with `apk add`.
    Install `sunwait` through OpenWrt's package manager for solar schedules.
 3. Open **Services → Home Controller** in LuCI. Set a separate household username and
-   password (at least 12 characters). No default household password is shipped.
+   password. Any non-empty password up to 256 characters is accepted. Click **Set
+   household password**; its result appears beside the button. No default household
+   password is shipped.
 4. Connect a TellStick, enter your devices and optional groups, and configure allowed
    LAN/VPN logical networks. TellStick selection is automatic.
 5. Set coordinates for your location. Keep time zone `router` to follow OpenWrt's
