@@ -1,0 +1,14 @@
+#!/bin/sh
+[ -z "${IPKG_INSTROOT:-}" ] || exit 0
+. /lib/functions.sh
+group_id=$(group_add_next homecontroller)
+user_exists homecontroller || user_add homecontroller '' "$group_id" 'Home Controller' /var/run/home-controller /bin/false
+mkdir -p /etc/home-controller/state /var/run/home-controller
+chown -R homecontroller:homecontroller /etc/home-controller /var/run/home-controller
+chmod 700 /etc/home-controller /etc/home-controller/state /var/run/home-controller
+chmod 600 /etc/home-controller/config.json
+/etc/init.d/rpcd restart
+/etc/init.d/home-controller enable
+rm -f /tmp/luci-indexcache.*.json
+if [ "$(jsonfilter -i /etc/home-controller/config.json -e '@.enabled')" = true ]; then /etc/init.d/home-controller restart; fi
+exit 0

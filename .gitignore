@@ -1,0 +1,11 @@
+.private/
+.tools/
+dist/
+build/
+*.exe
+*.apk
+*.adb
+*.key
+*.pem
+!release/*-public.pem
+node_modules/

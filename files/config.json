@@ -1,0 +1,6 @@
+{
+ "enabled": false, "port": 8443, "networks": ["lan"],
+ "timezone": "Etc/UTC", "latitude": 0, "longitude": 0,
+ "controller": "", "session_days": 30,
+ "devices": [], "groups": [], "schedules": []
+}

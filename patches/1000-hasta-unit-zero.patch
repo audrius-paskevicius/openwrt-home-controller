@@ -1,0 +1,22 @@
+--- a/service/ProtocolHasta.cpp
++++ b/service/ProtocolHasta.cpp
+@@ -82,6 +82,10 @@
+ std::string ProtocolHasta::getStringForMethodv2(int method) {
+ 	int house = this->getIntParameter(L"house", 1, 65536);
+ 	int unit = this->getIntParameter(L"unit", 1, 15);
++	// Some single-blind v2 remotes use unit zero. Keep the default unit 1.
++	if (this->getStringParameter(L"unit", L"") == L"0") {
++		unit = 0;
++	}
+ 	int sum = 0;
+ 	std::string strReturn;
+ 	strReturn.append(1, 245);
+@@ -190,7 +194,7 @@
+ 		}
+ 	}
+ 
+-	if(house < 1 || house > 65535 || unit < 1 || unit > 16) {
++	if(house < 1 || house > 65535 || (unit < 1 && model != "selflearningv2") || unit > 16) {
+ 		// not hasta
+ 		return "";
+ 	}

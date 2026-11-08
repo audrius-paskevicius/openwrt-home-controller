@@ -1,0 +1,9 @@
+EXPERIMENTAL, AI-GENERATED SOFTWARE — USE AT YOUR OWN RISK
+
+This is a free, open-source project. The person behind it supplied the ideas, requirements, and direction; AI generated the code. That person cannot independently verify every aspect of its implementation or behaviour. Testing does not guarantee correctness, reliability, or safety.
+
+The software sends commands to physical devices and runs scheduled actions. Errors may cause unexpected movement, damage, security weaknesses, data loss, or other harm.
+
+It is provided “as is,” without promised support, maintenance, or repair. To the fullest extent permitted by applicable law, the provider excludes warranties and liability arising from its use.
+
+Use only if you understand and accept the risks, have suitable backups and recovery arrangements, and can bear the resulting disruption, costs, or losses. Do not rely on it where failure could cause harm.

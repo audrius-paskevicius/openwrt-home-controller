@@ -1,0 +1,4 @@
+#!/bin/sh
+case "$ACTION" in ifup|ifdown|ifupdate)
+ [ -x /etc/init.d/home-controller ] && /etc/init.d/home-controller enabled && /etc/init.d/home-controller reload >/dev/null 2>&1
+;; esac

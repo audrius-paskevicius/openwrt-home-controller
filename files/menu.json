@@ -1,0 +1,1 @@
+{"admin/services/home-controller":{"title":"Home Controller","order":60,"action":{"type":"view","path":"home-controller"},"depends":{"acl":["luci-app-home-controller"]}}}
