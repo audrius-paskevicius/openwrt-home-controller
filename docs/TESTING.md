@@ -1,11 +1,19 @@
 # Release verification
 
+These entries record checks performed for each release. Older entries describe
+the interface and test suite at that time, not the current UI. Documentation is
+checked against the current source separately; this does not repeat live radio trials.
+
+## 0.2.3
+
 Version 0.2.3 adds a permanent disclaimer tab matching Wi-Fi Coordinator's warning
 label, amber notice, and emphasized closing paragraph. Live native LuCI checks
 verified the canonical text, removal of General's Read warning button, and the
 Save bar hiding on the disclaimer and returning on settings tabs, including after
 page reload. Existing acknowledgement tests and form-handler checks passed. The
 signed package upgrade preserved configuration, credentials and Scheduler state.
+
+## 0.2.2
 
 Version 0.2.2 uses native LuCI form maps, sortable grid sections, modal editors and
 the standard view action bar. Synthetic RPC checks in the router's actual LuCI
@@ -33,6 +41,8 @@ layout, its manifest and the new 180/192/512-pixel house icons. No radio command
 were sent. Existing phone shortcuts may need to be re-added to refresh cached icons;
 physical phone shortcut installation is not covered by these browser tests.
 
+## 0.2.1
+
 Version 0.2.1 replaces custom LuCI styling with native tabs, widgets and table/form
 markup. Browser checks cover the compact control layout, unchanged 46-pixel
 buttons with 8-pixel gaps, configurable symbols (including None), and responsive
@@ -48,7 +58,9 @@ Shortcut assets include a manifest, scalable source, and 180/192/512-pixel PNGs;
 browser delivery is checked, but installation on physical iOS/Android devices is
 not part of the automated tests.
 
-Version 0.2.0 redesigns both interfaces and adds control scheduler control.
+## 0.2.0
+
+Version 0.2.0 redesigns both interfaces and adds Scheduler Start/Stop to the control page.
 Automated tests cover persistent Stop/Start, cancellation of waiting scheduled
 commands while retaining manual commands, no missed-event replay, next weekly
 event calculation, authentication/CSRF checks and failure to save scheduler state.
@@ -66,11 +78,15 @@ native editors and inline password validation were checked. A disabled schedule
 was saved and deleted through LuCI; no test schedule remains. This release's live
 checks issued no blind commands and did not modify the separate FHEM host.
 
-Version 0.1.2 removes the minimum control-password length. Validation accepts
+## 0.1.2
+
+Version 0.1.2 removes the minimum shared-password length. Validation accepts
 short non-empty passwords, rejects empty/overlong values, and counts Unicode
 characters consistently. The LuCI handler test exercises inline saving, success,
 validation and server/network error messages, plus duplicate-click prevention.
 Tests use synthetic passwords; deployment preserves the existing control account.
+
+## 0.1.1
 
 Version 0.1.1 adds automatic TellStick selection. All 15 application tests passed
 on the router, including replacement of a disconnected controller, stable selection
@@ -79,6 +95,8 @@ service selected the attached TellStick automatically. The actual LuCI view was
 rendered with zero, one and multiple devices: no serial input is shown, and multiple
 devices produce a read-only identification of the one in use. Multiple-device and
 replacement cases were simulated; this update did not require radio transmissions.
+
+## 0.1.0
 
 Version 0.1.0 was exercised on an OpenWrt 25.12.6 mvebu/cortexa9 ARMv7 router with
 an original USB TellStick. A separate TellStick Duo, attached to an unchanged FHEM

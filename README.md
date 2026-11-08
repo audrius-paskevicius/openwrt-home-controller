@@ -1,5 +1,18 @@
 # Home Controller
 
+<!-- project-disclaimer:start -->
+> [!WARNING]
+> **EXPERIMENTAL, AI-GENERATED SOFTWARE — USE AT YOUR OWN RISK**
+>
+> This is a free, open-source project. The person behind it supplied the ideas, requirements, and direction; AI generated the code. That person cannot independently verify every aspect of its implementation or behaviour. Testing does not guarantee correctness, reliability, or safety.
+>
+> The software controls physical devices and runs scheduled actions. Errors may cause unexpected movement, missed or repeated actions, injury, property damage, network disruption, security weaknesses, data loss, or other harm.
+>
+> It is provided “as is,” without promised support, maintenance, or repair. To the fullest extent permitted by applicable law, the provider excludes warranties and liability arising from its use.
+>
+> Use only if you understand and accept the risks, have suitable backups and recovery arrangements, and can bear the resulting disruption, costs, or losses. Do not rely on it where failure could cause harm.
+<!-- project-disclaimer:end -->
+
 A local OpenWrt home controller with a separate control page, LuCI administration,
 weekly and solar schedules, and a replaceable Telldus transport. Initial device support
 is Hasta selflearningv2 blinds (Up, Stop, Down). MQTT is reserved for a future optional adapter.
@@ -7,6 +20,12 @@ is Hasta selflearningv2 blinds (Up, Stop, Down). MQTT is reserved for a future o
 Users get a small mobile-friendly control page with a shared login and
 remembered sessions. Administrators manage devices, groups, accounts and schedules in
 LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
+
+LuCI has **General**, **Controls**, **Schedules**, **Access**, **Advanced**, and the
+full disclaimer tab. Device and schedule editors change a pending form; **Save**
+stores a draft, **Save & Apply** activates it, and **Reset** discards unapplied changes.
+The shared login allows device commands and Scheduler Start/Stop; configuration
+and account management stay in LuCI.
 
 - Individual and group Up, Stop and Down controls; explicit unknown device position.
 - Weekly schedules and optional `sunwait` sunrise, sunset, civil dawn and dusk events.
@@ -20,14 +39,29 @@ LuCI. Access is restricted to selected LAN networks and configured VPN tunnels.
 - Unprivileged control services, independent HTTPS key, and no cloud dependency.
 - Patched Telldus driver preserving Hasta selflearningv2 unit-zero support.
 
-The initial binary release targets **OpenWrt 25.12, ARMv7 mvebu/cortexa9**. Other
-architectures require rebuilding. MQTT is a future extension, not a dependency.
+Published binaries target **OpenWrt 25.12, ARMv7 mvebu/cortexa9** and were tested on
+OpenWrt 25.12.6. Other architectures require changing the build target and rebuilding.
+MQTT is a future extension, not a dependency.
 
 Read the [disclaimer](DISCLAIMER.txt), then the [installation guide](docs/INSTALL.md).
 See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), and
 [releases](https://github.com/audrius-paskevicius/openwrt-home-controller/releases).
 The [test report](docs/TESTING.md) distinguishes radio verification from physical
 position feedback.
+
+The [latest release](https://github.com/audrius-paskevicius/openwrt-home-controller/releases/latest)
+provides the signed application and driver APKs, their source archives, the public
+signing key, the full `DISCLAIMER.txt`, and `SHA256SUMS`. The README and release
+description display the full notice before installation instructions.
+
+| Path | Contents |
+| --- | --- |
+| `cmd/home-controller/` | Backend, scheduler, authentication and administrator RPC |
+| `luci/`, `web/` | LuCI administration and the separate control page |
+| `src/`, `patches/` | Radio helper and Telldus Hasta unit-zero correction |
+| `files/`, `scripts/` | Defaults, service hooks, builds and source checks |
+| `tests/`, `.github/workflows/` | UI checks and CI; Go tests are beside the backend |
+| `docs/`, `release/` | Documentation and public package verification key |
 
 No personal credentials, coordinates, radio addresses, or private keys belong in this repository.
 Local deployment information lives in the ignored `.private/` directory.

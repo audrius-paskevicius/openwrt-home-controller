@@ -13,7 +13,9 @@ The patched Telldus daemon performs USB communication.
 
 The LuCI page calls an administrator-only rpcd plugin. It validates configuration
 before applying it. Control access never grants a router session or exposes
-configuration, command execution, arbitrary file access, or radio addresses.
+administrator configuration, arbitrary shell execution, file access, or radio addresses.
+The authenticated state API does expose the names, symbols and membership needed
+for controls, last-command status, and the next scheduled action.
 LuCI uses native `form.JSONMap`, tabbed sections, `GridSection` tables, modal editors,
 input validation and the standard view action bar. Settings use the active LuCI
 theme; only the disclaimer notice has scoped styling matching Wi-Fi Coordinator.
@@ -24,7 +26,8 @@ The JSON configuration has a separate root-only `pending.json` draft. RPC `stage
 validates and stores it; `save` activates validated settings in `config.json` and
 removes the draft; `discard` removes only the draft. The running service reads only
 the active file. RPC `get` distinguishes editable and active settings so pending
-edits do not misrepresent service status. These methods require LuCI write access.
+edits do not misrepresent service status. Draft/save/discard methods require LuCI
+write access; `get` and session listing use the application's LuCI read permission.
 `control_order` contains typed device/group keys and a distinct Scheduler key;
 unknown or duplicate keys are rejected, and omitted controls append in default order.
 
@@ -52,9 +55,11 @@ permission is granted. Login requires JSON and is also origin checked.
 
 Listeners bind to selected logical network addresses and detected active VPN tunnel
 addresses, never wildcard addresses. The default selected logical network is LAN.
-WireGuard, OpenVPN/OpenConnect netifd interfaces and active TUN/TAP interfaces are
+WireGuard, OpenVPN/OpenConnect netifd interfaces and active TUN/TAP/XFRM interfaces are
 detected. Other routed VPNs can be selected by their logical network name in LuCI.
-WAN/wan6 devices are explicitly excluded. IPv4 and non-link-local IPv6 are supported.
+Devices assigned to the logical networks named `wan` and `wan6` are explicitly
+excluded. This depends on those network names; it is not a classification of every
+possible custom topology. IPv4 and non-link-local IPv6 are supported.
 A separate nftables input chain drops traffic to the application port arriving on
 other interfaces, before normal router input filtering. Existing firewall rules still
 apply: a VPN zone that rejects router input needs an administrator rule allowing this
@@ -66,6 +71,7 @@ Network hotplug events refresh the service bindings.
 The controller and control web server run as `homecontroller`. Their configuration
 directory is root-owned; configuration and credential files are root-owned and group
 readable. Only session/scheduler state storage and the runtime directory are writable by the service.
+The pending configuration file is root-only and never loaded by the daemon.
 The separate control HTTPS private key is root-owned and group-readable by the
 dedicated web server. LuCI's key and the router CA's key are never shared with it.
 Privileged application of network rules, service configuration and account changes
@@ -82,7 +88,7 @@ Unknown device position is explicit: a successful send is not a position measure
 One queue handles all control and scheduled commands. A newer command replaces a
 queued command for the same device. Stop is placed before other queued movement.
 An already executing radio call is bounded by a timeout; Stop cannot interrupt a
-packet already being transmitted. Queued commands expire instead of replaying stale
+packet already being transmitted. Queued commands expire after 30 seconds instead of replaying stale
 movement. Group operations expand to individual device commands and are serialized.
 
 The scheduler evaluates events every five seconds. It skips downtime/time jumps over
@@ -92,7 +98,13 @@ converted using the selected time zone. `router` follows OpenWrt's zone name. A 
 offset is applied before optional earliest/latest bounds. Missing solar events are
 skipped unless a fallback time is set. Fixed-time schedules do not require sunwait.
 
-Control Scheduler Stop persists before taking effect, cancels waiting scheduled
+The router zone name is resolved when the service is configured; OpenWrt system
+configuration changes trigger a reload. Both successful and failed solar calculations
+are cached by event/date until service restart or cache eviction. Fallback applies
+only to a reported absent solar event, not to execution or parsing failures, and
+does not receive the solar offset. Earliest/latest bounds apply afterward.
+
+Scheduler Stop persists before taking effect, cancels waiting scheduled
 commands and prevents future scheduled sends. Manual commands remain available.
 It cannot interrupt an in-flight radio call and does not send Stop to the blinds.
 Start clips the evaluation interval to its resume time, avoiding missed-event replay.

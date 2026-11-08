@@ -1,15 +1,23 @@
 # Build and publication
 
+Read the [full disclaimer](../DISCLAIMER.txt) before building or installing.
+
 The repository is self-contained: application and UI source, radio helper, driver
 patch, package scripts, tests, documentation and public package verification key are
 included. External inputs are the Go toolchain, OpenWrt SDK/package sources and
-Telldus upstream source. The initial release targets OpenWrt 25.12 on ARMv7
-(mvebu/cortexa9); other targets require rebuilding the driver and radio helper.
+Telldus upstream source. The build scripts target OpenWrt 25.12 on ARMv7
+(mvebu/cortexa9). Other targets require changing the SDK, Go architecture settings
+and APK architecture metadata, then rebuilding the backend, driver and radio helper.
 
-On a Linux build host with Go, GCC build prerequisites, curl, tar and zstd:
+Run the commands from the repository root on a Linux x86-64 host with **Go 1.26 or
+later**, **Node.js 24 or later**, Python 3, Bash, Git, make/GCC and the OpenWrt SDK's
+host build prerequisites, tar and zstd. CI uses Ubuntu 24.04 and Go 1.27. Native
+apk-tools v3 with `mkpkg` and `adbsign` is also needed for packaging; ordinary older
+apk-tools builds may not provide those applets.
 
 ```
 go test -race ./...
+python3 scripts/check-source.py
 node tests/check-js.cjs
 node tests/account-ui.cjs
 mkdir -p dist
@@ -17,31 +25,47 @@ GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' 
 bash scripts/build-radio.sh
 ```
 
-The radio build uses the OpenWrt SDK and its package build definitions, upgrades
-Telldus to 2.1.3-beta1, and applies the Hasta selflearningv2 unit-zero correction.
-The source and patch must accompany distributed driver binaries.
+The radio build downloads the SHA256-pinned OpenWrt 25.12.6 mvebu/cortexa9 SDK,
+fetches its package feeds, upgrades Telldus to the checksum-pinned 2.1.3-beta1 source,
+and applies the Hasta selflearningv2 unit-zero correction. Feed revisions are not
+pinned by this script; this is not a promise of byte-identical future rebuilds.
+Outputs include `dist/home-controller-radio`, the Telldus APK and corresponding-source
+archive, and `dist/hasta-test`. The source and patch must accompany distributed
+driver binaries.
 
 Create your own signing key outside the public tree:
 
 ```
-go run scripts/genkey.go /private/home-controller-signing.pem release/home-controller-public.pem
-SIGN_KEY=/private/home-controller-signing.pem APK_TOOL=/path/to/apk.static sh scripts/build-apk.sh
+mkdir -p ../home-controller-signing/public
+chmod 700 ../home-controller-signing
+go run scripts/genkey.go ../home-controller-signing/private.pem ../home-controller-signing/public/local-public.pem
+SIGN_KEY="$(pwd)/../home-controller-signing/private.pem" APK_TOOL=/path/to/apk.static sh scripts/build-apk.sh
 ```
 
-Use apk-tools v3 with the `mkpkg` and `adbsign` applets. Re-sign the driver APK with
-the same release key. Work on a copy: signing tools may modify a file even on failure.
-The SDK uses a temporary key, so allow that input only during re-signing:
+The application builder reads [VERSION](../VERSION), requires the backend and radio
+helper in `dist/`, and creates `dist/luci-app-home-controller-VERSION.apk`. It copies
+the canonical disclaimer into the package and both interfaces. It does not generate
+the public key, release notes, source ZIP or checksum manifest. Keep the repository's
+published verification key unchanged when building with your own key.
+
+Re-sign a copy of the SDK-built driver APK with the same key used for your application
+APK. Signing tools may modify a file even on failure. The SDK uses a temporary key,
+so allow that input only during re-signing:
 
 ```
-apk.static adbsign --allow-untrusted --reset-signatures --sign-key /private/home-controller-signing.pem dist/telldus-core-2.1.3_beta1-r10.apk
-apk verify "dist/luci-app-home-controller-$(cat VERSION).apk" dist/telldus-core-2.1.3_beta1-r10.apk
+cp dist/telldus-core-2.1.3_beta1-r10.apk dist/telldus-core-local.apk
+/path/to/apk.static adbsign --allow-untrusted --reset-signatures \
+  --sign-key ../home-controller-signing/private.pem dist/telldus-core-local.apk
+/path/to/apk.static --keys-dir ../home-controller-signing/public verify \
+  "dist/luci-app-home-controller-$(cat VERSION).apk" dist/telldus-core-local.apk
 ```
 
 Verification and installation must use the trusted public key, without
 `--allow-untrusted`. Publish only sanitized release files. The radio build also
 produces the patched corresponding-source archive and the `hasta-test` executable;
 run that test on the target (it calculates packets without transmitting).
-The public verification key belongs in `/etc/apk/keys/` on the target.
+Your corresponding public verification key belongs in `/etc/apk/keys/` on the target.
+The repository's public key cannot verify packages signed with your private key.
 
 `node tests/browser-ui.cjs` exercises the control page in a disposable headless Chrome
 listening on localhost:9222 (Node 24 or later). It injects synthetic API responses
@@ -51,6 +75,29 @@ LuCI form model, password feedback and Save/Apply/Reset handlers with stubbed fo
 components. `node tests/warning-ui.cjs` checks acknowledgement and storage behavior
 for both interfaces. Native LuCI rendering is checked separately on the target.
 Set `UI_SCREENSHOTS=1` to save control screenshots under ignored `.private/`.
+The Chrome startup and teardown commands used in CI are in
+[the build workflow](../.github/workflows/build.yml). CI tests and compiles the
+backend and radio artifacts; it does not sign or publish release APKs.
+
+## Release visibility and contents
+
+Place the complete canonical [DISCLAIMER.txt](../DISCLAIMER.txt) at the top of the
+README and release description in a GitHub `> [!WARNING]` block, before feature or
+installation text. Keep the wording identical to the packaged notice. The README
+block is delimited by `project-disclaimer` comments. Publish the notice as a separate
+download too, as in the Wi-Fi Coordinator repository.
+
+A release has seven assets: application APK, driver APK, application source ZIP,
+driver corresponding-source archive, public signing key, `DISCLAIMER.txt`, and
+`SHA256SUMS`. The manifest covers the other six files. Release notes identify the
+target architecture and SHA256 of the public-key file. Check uploaded asset digests
+against the local files. Generate the application source ZIP with `git archive`
+from the exact release commit, using a `home-controller/` prefix. Source archives
+remain snapshots of their release tags; later documentation corrections on `main`
+do not change those tags or binaries.
+
+The installed interfaces and `/usr/share/home-controller/DISCLAIMER.txt` also expose
+the notice. Current package hooks do not print it to the terminal during installation.
 
 `.private/` holds local deployment settings and test evidence; `.tools/` holds local
 development tools. Both are excluded from Git. Do not publish them, browser profiles,
