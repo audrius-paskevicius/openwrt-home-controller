@@ -124,10 +124,10 @@ function paintIKEASlider(input,unknown=false){
  input.setAttribute('aria-valuetext',text);input.title=labels[action]+': '+text;
 }
 function ikeaStatusText(live){
- if(!live.reachable)return 'Unavailable';if(live.power===false)return 'Off';if(live.power!==true)return 'Mixed';
+ if(!live.reachable)return 'Unavailable';if(live.partial)return 'Status incomplete';if(live.power===false)return 'Off';if(live.power!==true)return 'Mixed';
  let text='On';if(live.brightness>=0&&live.brightness!=null)text+=' '+live.brightness+'%';else if(live.brightness===-1)text+=' · Mixed';
  if(live.mode==='white'&&live.temperature>0)text+=' '+live.temperature+'K';
- if(live.partial)text+=' · Some unavailable';return text;
+ return text;
 }
 function renderIKEA(el,item){
  if(!el)return;const live=item.ikea||{},available=!!live.reachable;el.dataset.available=String(available);

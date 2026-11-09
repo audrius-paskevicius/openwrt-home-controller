@@ -273,8 +273,11 @@ so a mixed group never sends light settings to a plug. Partial failures are repo
 there is no rollback or replay. Expired queued commands are not sent.
 
 Group state is derived from member reports rather than the gateway's potentially stale
-group attributes. Different member values show Mixed, and partial availability is shown
-quietly. Current unavailability takes precedence over older command errors and
+group attributes. Different member values show Mixed. If some members are reachable and others unavailable,
+the group shows Status incomplete, without power/brightness/temperature claims
+about the whole group. Gateway reachability and last-seen values can lag physical
+power loss; frequent GETs refresh gateway data, not necessarily bulb contact. No
+fixed age timeout is inferred from last-seen timestamps. Current unavailability takes precedence over older command errors and
 keeps controls disabled; an unreachable target is not reported as Off. Command
 errors remain visible for reachable targets, including partially reachable groups.
 A new Mixed group result is confirmed on a later browser poll (at least four

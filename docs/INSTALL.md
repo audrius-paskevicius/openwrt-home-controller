@@ -339,7 +339,9 @@ confirmation of the lamp's state. The browser temporarily polls the cached resul
 more often without making its own connection to the gateway.
 
 When a previous stable group result exists, a new inconsistent report is held for
-at least four seconds before showing Mixed. Persistent differences and unavailable members remain visible. White and
+at least four seconds before showing Mixed. If some group members are reachable and others unavailable, the group shows Status incomplete
+instead of presenting the reachable subset's power, brightness or temperature
+as the whole group's state. White and
 colour are alternative modes: the remembered W setting remains in place when you
 choose a colour dot. Status text uses gateway feedback, not the slider selection.
 Changes from IKEA Home smart 1 are detected on later inventory reads; during the
@@ -349,3 +351,9 @@ change from the effects of its own command.
 An unreachable IKEA device or fully unreachable group shows Unavailable with
 disabled controls, even when an earlier command had a partial-send error. This is
 not an Off reading: the gateway cannot currently confirm the lamps' state.
+
+Gateway availability flags can remain stale after a mains power cut. Re-reading the
+gateway does not prove that each bulb was just contacted. The last-seen timestamp
+has no heartbeat interval established by this integration, so it is not used as an
+automatic offline timeout. Status incomplete can remain until the gateway reports
+all members unavailable (then the tile shows Unavailable) or a complete state.

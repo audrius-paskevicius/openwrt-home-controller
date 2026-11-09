@@ -188,6 +188,13 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.match(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),/Mixed/);
  await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.brightness=39;refresh()`);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),stableGroup);
+ // An incomplete group must not describe the reachable subset as the whole
+ // group's confirmed power/brightness, regardless of its retained On/Off value.
+ for(const power of [true,false,null]){
+  await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.partial=true;fixture.devices.find(d=>d.id==='ikea').ikea.power=${JSON.stringify(power)};refresh()`);
+  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'Status incomplete');
+ }
+ await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.partial=false;fixture.devices.find(d=>d.id==='ikea').ikea.power=true;refresh()`);
  // Losing power is current Unavailable state, not an old partial-send error.
  await page.run(`(()=>{const d=fixture.devices.find(d=>d.id==='ikea');d.state={action:'on',status:'IKEA: 3 sent, 3 unavailable or failed',at:1};d.ikea.reachable=false;d.ikea.partial=false;document.querySelector('[data-id=ikea]').dataset.clientError='Earlier request failed';})();refresh()`);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'Unavailable');

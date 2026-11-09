@@ -5,6 +5,14 @@ previous hardware trials. Build and test commands are in [BUILD.md](BUILD.md).
 Read the [disclaimer](../DISCLAIMER.txt); passing checks does not establish universal
 hardware compatibility, physical position feedback or measured colour accuracy.
 
+## 0.4.8 incomplete group reports
+
+Browser regressions check that a partial IKEA group shows Status incomplete for
+retained On, Off or mixed power values. A read-only gateway check after a reported
+mains outage confirmed that reachability flags can remain stale; a successful GET
+is not proof of contact with each lamp. The opt-in read test now also logs the
+reported last-seen timestamp and age. It performs no lamp writes.
+
 ## 0.4.7 availability feedback
 
 A browser regression checks that an unreachable IKEA group displays neutral

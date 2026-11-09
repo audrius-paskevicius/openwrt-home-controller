@@ -340,7 +340,16 @@ func TestIKEARouterRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.conn.Close()
-	items, err := readIKEAInventory(func(path string, out any) error { return conn.request(1, path, nil, out) }, c.Gateway)
+	items, err := readIKEAInventory(func(path string, out any) error {
+		err := conn.request(1, path, nil, out)
+		if err == nil && strings.HasPrefix(path, "/15001/") {
+			if raw, ok := out.(*map[string]json.RawMessage); ok {
+				seen := rawInt(*raw, "9020")
+				t.Logf("%s: gateway_reachable=%d last_seen=%d age_seconds=%d", rawString(*raw, "9001"), rawInt(*raw, "9019"), seen, time.Now().Unix()-int64(seen))
+			}
+		}
+		return err
+	}, c.Gateway)
 	if err != nil {
 		t.Fatal(err)
 	}
