@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -38,13 +39,20 @@ func rpc() error {
 		return errors.New("administrator required")
 	}
 	if len(os.Args) > 2 && os.Args[2] == "list" {
-		fmt.Print(`{"get":{},"save":{"config":""},"stage":{"config":""},"discard":{},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
+		fmt.Print(`{"get":{},"save":{"config":"","controller_instance":""},"stage":{"config":"","controller_instance":""},"discard":{},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
 		return nil
 	}
 	if len(os.Args) < 4 {
 		return errors.New("missing RPC method")
 	}
 	method := os.Args[3]
+	if method == "get" || method == "save" || method == "stage" || method == "discard" {
+		unlock, err := configLock()
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
 	respond := func(v any) { json.NewEncoder(os.Stdout).Encode(v) }
 	errResult := func(e error) error { respond(map[string]string{"error": e.Error()}); return nil }
 	switch method {
@@ -55,6 +63,10 @@ func rpc() error {
 		restart()
 		respond(map[string]bool{"ok": true})
 	case "get":
+		available := controllers()
+		if e := clearMissingPreferences(base, available); e != nil {
+			return errResult(e)
+		}
 		c, e := loadConfig()
 		if e != nil {
 			return errResult(e)
@@ -65,7 +77,6 @@ func rpc() error {
 		readJSON(base+"/credential.json", &cred)
 		var access any
 		readJSON(run+"/access.json", &access)
-		available := controllers()
 		var active map[string]string
 		readJSON(run+"/controller.json", &active)
 		connected := false
@@ -89,8 +100,9 @@ func rpc() error {
 		respond(map[string]bool{"ok": true})
 	case "save", "stage":
 		var args struct {
-			Config     string `json:"config"`
-			RPCSession string `json:"ubus_rpc_session"`
+			Config             string `json:"config"`
+			ControllerInstance string `json:"controller_instance"`
+			RPCSession         string `json:"ubus_rpc_session"`
 		}
 		if e := decode(os.Stdin, &args); e != nil {
 			return errResult(e)
@@ -102,14 +114,28 @@ func rpc() error {
 		if _, _, e := networkAccess(c); e != nil {
 			return errResult(e)
 		}
+		previous, e := loadConfig()
+		if e != nil {
+			return errResult(e)
+		}
+		c.PreferredController = submittedPreference(c.PreferredController, args.ControllerInstance, controllers())
+		onlyPreference := previous
+		onlyPreference.PreferredController = c.PreferredController
 		if e := storeConfig(base, c, method == "save"); e != nil {
 			return errResult(e)
 		}
 		if method == "save" {
 			adminFile(base + "/config.json")
-			restart()
+			if previous.PreferredController != c.PreferredController && reflect.DeepEqual(onlyPreference, c) {
+				if e := refreshRadio(c); e != nil {
+					return errResult(e)
+				}
+			} else {
+				restart()
+			}
 		}
-		respond(map[string]bool{"ok": true})
+		c.PreferredController = connectedPreference(c.PreferredController, controllers())
+		respond(map[string]any{"ok": true, "preferred_controller": c.PreferredController})
 	case "password":
 		var args struct {
 			User       string `json:"user"`
@@ -182,7 +208,12 @@ func controllers() []map[string]string {
 		if pid != "0c30" && pid != "0c31" {
 			continue
 		}
-		out = append(out, map[string]string{"serial": read("serial"), "product": read("product"), "bus": read("busnum"), "device": read("devnum")})
+		capability := "Transmit only"
+		if pid == "0c31" {
+			capability = "Transmit and receive"
+		}
+		realPath, _ := filepath.EvalSymlinks(p)
+		out = append(out, map[string]string{"serial": read("serial"), "product": read("product"), "bus": read("busnum"), "device": read("devnum"), "capability": capability, "path": strings.TrimPrefix(realPath, "/sys")})
 	}
 	return out
 }
@@ -350,6 +381,14 @@ func configure() error {
 	if os.Geteuid() != 0 {
 		return errors.New("root required")
 	}
+	unlock, e := configLock()
+	if e != nil {
+		return e
+	}
+	defer unlock()
+	if e := clearMissingPreferences(base, controllers()); e != nil {
+		return e
+	}
 	c, e := loadConfig()
 	if e != nil {
 		return e
@@ -360,7 +399,7 @@ func configure() error {
 	}
 	var previous map[string]string
 	readJSON(run+"/controller.json", &previous)
-	selected := selectController(controllers(), previous["serial"])
+	selected := preferredController(controllers(), c.PreferredController, previous["serial"])
 	if u, e := user.Lookup("homecontroller"); e == nil {
 		gid, _ := strconv.Atoi(u.Gid)
 		if usb := selected; usb != nil {
@@ -421,19 +460,9 @@ func configure() error {
 	own(run + "/listen.json")
 	atomicJSON(run+"/access.json", map[string]any{"interfaces": devices, "listeners": binds})
 	own(run + "/access.json")
-	// Do not override another application's TellStick configuration silently.
-	var radio strings.Builder
-	radio.WriteString("# Managed by Home Controller\nuser = \"homecontroller\"\ngroup = \"homecontroller\"\n")
-	if selected != nil {
-		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", selected["serial"])
-	}
-	for _, d := range c.Devices {
-		fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"hasta\"\n model = \"selflearningv2\"\n controller = 1\n parameters {\n house = %d\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.House, d.Unit)
-	}
-	if e = os.WriteFile("/etc/tellstick.conf", []byte(radio.String()), 0600); e != nil {
+	if e := writeRadioConfig(c, selected); e != nil {
 		return e
 	}
-	adminFile("/etc/tellstick.conf")
 	if !exists(base+"/tls.crt") || !exists(base+"/tls.key") {
 		if e := renewTLS(); e != nil {
 			return e

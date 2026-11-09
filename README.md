@@ -34,6 +34,8 @@ and account management stay in LuCI.
 - Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
 - Consistent 24-hour times and ISO 8601 date-times with time-zone offsets.
 - Native LuCI forms, tabs and sortable tables, with Save, Save & Apply and Reset.
+- A live list of connected TellSticks, capabilities and the transmitter in use.
+  Optional **Preferred TellStick** selection returns to Automatic when unplugged.
 - Compact web-server help with Wi-Fi Coordinator-style hover, focus and tap support.
 - One freely ordered list of devices, groups and Scheduler; configurable symbols.
 - Compact two-column phone controls and a desktop grid that uses the available width.

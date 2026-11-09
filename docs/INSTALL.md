@@ -17,7 +17,8 @@ driver/helper binaries on another architecture.
    **Set password**; its result appears beside the button. Fresh packages ship with
    the service disabled, no devices or schedules, and no stored login credentials.
 4. Connect a TellStick and add devices and optional groups in **Controls**.
-   Internal IDs are generated automatically. TellStick selection is automatic.
+   Internal IDs are generated automatically. TellStick selection defaults to
+   Automatic; **Advanced → Preferred TellStick** can select a connected stick.
    Under **Advanced → Allowed networks**, select the LAN and VPN networks that may
    access the control page. Fresh installations select LAN only. VPNs must be selected
    explicitly; leaving a VPN unchecked excludes it. WAN cannot be selected.
@@ -198,12 +199,31 @@ sessions remain valid until expiry or revocation.
 
 ## Hardware replacement
 
-Connect a compatible original TellStick or TellStick Duo; no serial setting or save
-is required. Existing blind addresses remain unchanged. When several TellSticks are
-connected, LuCI identifies the one selected automatically. The current device is kept
-while connected; otherwise the first available device in USB-port order is selected.
-Old manually configured serial numbers are ignored and removed on the next save.
-USB hotplug refreshes permissions and service access. New controller models or firmware
+Connect a compatible original TellStick or TellStick Duo. **General** lists only
+currently connected sticks with model, serial, capabilities and which is in use
+for sending. A Duo's receiving capability is informational; Home Controller does
+not currently consume received radio events. The list refreshes every three seconds.
+
+**Advanced → Preferred TellStick** defaults to **Automatic**. Automatic keeps the
+current transmitter while connected, otherwise chooses the first available stick
+in USB-port order. An explicit preference uses a connected stick after Save & Apply.
+Unplugging that stick clears the preference to Automatic in both active settings
+and any saved draft, preserving unrelated edits. Reconnecting it adds it back to
+the list but does not restore the preference. No disconnected-device list is kept.
+Booting without the preferred stick also clears its preference. Old legacy
+`controller` settings are still ignored; the current field is `preferred_controller`.
+
+Adding/removing an unused stick does not restart the controller or its driver.
+USB changes settle briefly; a necessary handover waits for the current radio call
+and restarts only the Telldus driver. Changing only the preference uses the same
+path. Other applied settings, including reapplying unchanged settings, retain the
+normal full service restart. Schedules,
+the control page and recent command history remain active during a radio-only
+handover. Commands that fail during disconnection are reported and not replayed.
+With no stick connected, commands fail explicitly; connecting one restores radio
+operation automatically. Existing blind addresses remain unchanged.
+
+New controller models or firmware
 may require additional support and must be tested; this is not a promise of universal
 Telldus hardware compatibility. No firmware is flashed by this package.
 

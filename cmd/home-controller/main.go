@@ -64,19 +64,20 @@ type Schedule struct {
 	Fallback string `json:"fallback"`
 }
 type Config struct {
-	Enabled       bool       `json:"enabled"`
-	Port          int        `json:"port"`
-	Networks      []string   `json:"networks"`
-	Timezone      string     `json:"timezone"`
-	Latitude      float64    `json:"latitude"`
-	Longitude     float64    `json:"longitude"`
-	Controller    string     `json:"controller,omitempty"` // Accepted only to migrate older configuration.
-	SessionDays   int        `json:"session_days"`
-	Devices       []Device   `json:"devices"`
-	Groups        []Group    `json:"groups"`
-	Schedules     []Schedule `json:"schedules"`
-	SchedulerIcon string     `json:"scheduler_icon,omitempty"`
-	ControlOrder  []string   `json:"control_order,omitempty"`
+	Enabled             bool       `json:"enabled"`
+	Port                int        `json:"port"`
+	Networks            []string   `json:"networks"`
+	Timezone            string     `json:"timezone"`
+	Latitude            float64    `json:"latitude"`
+	Longitude           float64    `json:"longitude"`
+	Controller          string     `json:"controller,omitempty"` // Accepted only to migrate older configuration.
+	PreferredController string     `json:"preferred_controller,omitempty"`
+	SessionDays         int        `json:"session_days"`
+	Devices             []Device   `json:"devices"`
+	Groups              []Group    `json:"groups"`
+	Schedules           []Schedule `json:"schedules"`
+	SchedulerIcon       string     `json:"scheduler_icon,omitempty"`
+	ControlOrder        []string   `json:"control_order,omitempty"`
 }
 type Credential struct {
 	User     string `json:"user"`
@@ -210,6 +211,9 @@ func validTime(s string, optional bool) bool {
 	return e == nil && len(s) == 5
 }
 func validate(c Config) error {
+	if c.PreferredController != "" && !regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`).MatchString(c.PreferredController) {
+		return errors.New("invalid preferred TellStick serial")
+	}
 	if err := validateControlOrder(c); err != nil {
 		return err
 	}
@@ -551,6 +555,18 @@ func (s *Server) enqueue(target, action, source string) error {
 	return nil
 }
 func (s *Server) send(c Command) error {
+	unlock, err := radioLock()
+	if err != nil {
+		return errors.New("radio is being reconfigured")
+	}
+	defer unlock()
+	if !c.Expires.IsZero() && time.Now().After(c.Expires) {
+		return errors.New("command expired")
+	}
+	var active map[string]string
+	if readJSON(run+"/controller.json", &active) != nil || active["serial"] == "" {
+		return errors.New("no TellStick connected")
+	}
 	var id int
 	for _, d := range s.config.Devices {
 		if d.ID == c.Device {
@@ -853,6 +869,8 @@ func main() {
 		e = rpc()
 	case "configure":
 		e = configure()
+	case "usb-change":
+		e = usbChange()
 	default:
 		e = errors.New("unknown operation")
 	}

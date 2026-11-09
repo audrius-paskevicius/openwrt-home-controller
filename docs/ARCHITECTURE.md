@@ -51,10 +51,28 @@ the active file. RPC `get` distinguishes editable and active settings so pending
 edits do not misrepresent service status. Draft/save/discard methods require LuCI
 write access; `get` and session listing use the application's LuCI read permission.
 Both `stage` and `save` require at least one selected network to have an active
-address, even if the service is disabled. After saving active settings, the RPC
-requests an asynchronous service restart; a successful RPC response does not prove
+address, even if the service is disabled. Applying only a changed transmitter preference
+reconciles the radio without restarting the backend/web service. Other active
+settings, including reapplying unchanged settings, request an asynchronous service
+restart; a successful RPC response does not prove
 that the restarted web/backend processes are healthy. No automatic configuration
 rollback is implemented by these JSON configuration methods.
+
+The optional `preferred_controller` is a currently connected USB serial; empty
+means Automatic. The legacy `controller` field remains ignored. USB changes and
+status reads remove missing preferences from active and pending settings without
+discarding other edits. Save/Stage include the selected USB bus/device identity
+as transient RPC metadata, preventing a stale page from restoring a preference
+after unplug/replug. Only the current selection is kept in RAM; there is no
+historical controller inventory. A reboot retains an explicit preference only
+if that stick is present when configuration is reconciled.
+
+Root configuration operations use a file lock to serialize Save/Apply, draft
+changes and USB reconciliation. A separate radio file lock serializes transmission
+with driver handover, and commands recheck expiry after waiting for it. Locks do
+not follow symlinks on Linux. Handover regenerates `/etc/tellstick.conf`, refreshes
+USB permissions and restarts only `telldusd`; unchanged selections do not restart
+anything. Backend, scheduler and web sessions survive a radio-only handover.
 `control_order` contains typed device/group keys and a distinct Scheduler key;
 unknown or duplicate keys are rejected, and omitted controls append in default order.
 

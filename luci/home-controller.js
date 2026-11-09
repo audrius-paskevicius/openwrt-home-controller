@@ -7,8 +7,8 @@
 'require home-controller-disclaimer as warning';
 
 const get=rpc.declare({object:'home-controller',method:'get',expect:{}});
-const apply=rpc.declare({object:'home-controller',method:'save',params:['config'],expect:{}});
-const stage=rpc.declare({object:'home-controller',method:'stage',params:['config'],expect:{}});
+const apply=rpc.declare({object:'home-controller',method:'save',params:['config','controller_instance'],expect:{}});
+const stage=rpc.declare({object:'home-controller',method:'stage',params:['config','controller_instance'],expect:{}});
 const discard=rpc.declare({object:'home-controller',method:'discard',expect:{}});
 const password=rpc.declare({object:'home-controller',method:'password',params:['user','password'],expect:{}});
 const revoke=rpc.declare({object:'home-controller',method:'revoke',expect:{}});
@@ -68,12 +68,13 @@ function model(c){
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
   schedule:c.schedules.map((s,i)=>({...s,enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
-  scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{session_days:c.session_days},advanced:{port:c.port,networks:c.networks}};
+  scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{session_days:c.session_days},advanced:{port:c.port,networks:c.networks,preferred_controller:c.preferred_controller||'automatic'}};
 }
 function configuration(m,original){
  const c=clone(original),controls=m.data.sections('json','control'),settings=m.data.get('json','scheduling');
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
  c.port=Number(m.data.get('json','advanced','port'));c.networks=list(m.data.get('json','advanced','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
+ c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
  c.devices=controls.filter(d=>d.kind==='device').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,radio_id:Number(d.radio_id),house:Number(d.house),unit:Number(d.unit)}));
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
@@ -97,18 +98,36 @@ return view.extend({
  load(){return Promise.all([get().then(result),warning.load()]).then(([data,text])=>({...data,disclaimer:text}));},
  render(data){this.disclaimer=data.disclaimer;return warning.gate(data.disclaimer,()=>this.renderSettings(data));},
  async renderSettings(data){
-  this.original=clone(data.config);const m=this.map=new form.JSONMap(model(data.config),'Home Controller');m.tabbed=true;let fresh=data;
+  this.original=clone(data.config);const m=this.map=new form.JSONMap(model(data.config),'Home Controller');m.tabbed=true;let fresh=data,preferred=null,choiceSignature='';
   const s=m.section(form.NamedSection,'general','general','General');s.hidetitle=true;
   const enabled=s.option(form.Flag,'enabled','Enable service','To pause scheduled actions only, use Scheduler on the control page.');enabled.rmempty=false;
-  const service=E('span'),controller=E('span'),scheduler=E('span'),links=E('span');
-  dummy(s,'_service','Service',()=>service);dummy(s,'_controller','TellStick',()=>controller);dummy(s,'_scheduler','Scheduler',()=>scheduler);dummy(s,'_links','Control page',()=>links);
+  const service=E('p',{role:'status',hidden:'',class:'alert-message warning'}),controller=E('div'),scheduler=E('span'),links=E('span');
+  dummy(s,'_controller','TellSticks',()=>controller);dummy(s,'_scheduler','Scheduler',()=>scheduler);dummy(s,'_links','Control page',()=>links);
   const updateStatus=d=>{
-   fresh=d;const active=d.active_config||d.config;service.textContent=active.enabled?'Enabled':'Disabled';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
+   const previousPreference=fresh.config.preferred_controller||'automatic';
+   fresh=d;this.connectedControllers=d.controllers||[];const active=d.active_config||d.config;service.hidden=true;service.textContent='';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
    const schedule=d.status?.scheduler;scheduler.title=active.enabled&&schedule?.running&&schedule.next?(schedule.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+schedule.next.at:'';
-   const devices=d.controllers||[];controller.textContent=devices.length>1?(d.active_controller?'Using '+d.active_controller.product+' ('+d.active_controller.serial+')':'Selected automatically when started'):(devices.length?'Connected':'Not connected');
+   const devices=d.controllers||[],titles=['Model','Serial','Capabilities','Use'];
+   controller.replaceChildren(devices.length?E('table',{class:'table'},[
+    E('tr',{class:'tr table-titles'},titles.map(t=>E('th',{class:'th'},t))),
+    ...devices.map(usb=>E('tr',{class:'tr'},[usb.product||'TellStick',usb.serial||'Unavailable',usb.capability||'Unknown',d.active_controller?.serial===usb.serial?'In use':'Available'].map((v,i)=>E('td',{class:'td','data-title':titles[i]},v))))
+   ]):E('span',{},'No TellStick connected'));
+   if(devices.some(usb=>usb.capability==='Transmit and receive'))controller.append(E('p',{class:'cbi-section-descr'},'Home Controller currently uses sending only.'));
+   if(preferred){
+    const choices={automatic:'Automatic',...Object.fromEntries(devices.filter(usb=>usb.serial).map(usb=>[usb.serial,(usb.product||'TellStick')+' ('+usb.serial+')']))};
+    const saved=d.config.preferred_controller||'automatic',current=preferred.formvalue('advanced')||'automatic';
+    const next=Object.hasOwn(choices,current)?(current===previousPreference?saved:current):'automatic';
+    preferred.keylist=[];preferred.vallist=[];Object.entries(choices).forEach(([k,v])=>preferred.value(k,v));
+    m.data.set('json','advanced','preferred_controller',Object.hasOwn(choices,saved)?saved:'automatic');
+    this.original.preferred_controller=d.config.preferred_controller||'';
+    const signature=JSON.stringify(choices),select=m.root?.querySelector('[id="'+preferred.cbid?.('advanced')+'"] select');
+    if(select&&signature!==choiceSignature)select.replaceChildren(...Object.entries(choices).map(([v,label])=>E('option',{value:v},label)));
+    preferred.getUIElement('advanced')?.setValue(Object.hasOwn(choices,next)?next:'automatic');
+    choiceSignature=signature;
+   }
    const address=d.access?.listeners?.[0];links.replaceChildren(address?E('a',{href:'https://'+address+'/',target:'_blank',rel:'noopener'},'Open controls'):'Unavailable while the service is stopped');
   };updateStatus(data);
-  poll.add(()=>{if(!m.root?.isConnected)return;return get().then(result).then(updateStatus).catch(()=>{service.textContent='Unable to refresh status';});},10);
+  poll.add(()=>{if(!m.root?.isConnected)return;return get().then(result).then(updateStatus).catch(()=>{service.textContent='Unable to refresh status';service.hidden=false;});},3);
   const controls=m.section(form.GridSection,'control','Controls','Drag rows to arrange the control page. Devices, groups, and Scheduler can appear in any order.');
   controls.hidetitle=true;controls.anonymous=true;controls.addremove=true;controls.sortable=true;controls.nodescriptions=true;controls.addbtntitle='Add device or group';controls.modaltitle=sid=>kinds[m.data.get('json',sid,'kind')]||'New control';
   let o=value(controls,'name','Name','maxlength(80)');o.validate=(_sid,v)=>v.trim()?true:'Enter a name.';
@@ -166,6 +185,11 @@ return view.extend({
   });
   dummy(access,'_session_list','',()=>sessionList);command(access,'_revoke','Sessions','Sign out all devices',async()=>{result(await revoke());sessionList.replaceChildren();return 'All sessions have been signed out.';});
   const advanced=m.section(form.NamedSection,'advanced','advanced','Advanced');advanced.hidetitle=true;
+  preferred=choice(advanced,form.ListValue,'preferred_controller','Preferred TellStick',
+   {automatic:'Automatic',...Object.fromEntries((data.controllers||[]).filter(usb=>usb.serial).map(usb=>[usb.serial,(usb.product||'TellStick')+' ('+usb.serial+')']))},
+   'Used for sending. If unplugged, the setting returns to Automatic. Reconnecting the stick does not restore the preference.');
+  this.preferredOption=preferred;
+  preferred.validate=(_sid,v)=>v==='automatic'||(fresh.controllers||[]).some(usb=>usb.serial===v)?true:'Select Automatic or a connected TellStick.';
   o=value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))','Separate web server for the control page.');
   o.renderFrame=function(...args){const node=form.Value.prototype.renderFrame.apply(this,args);const description=node.querySelector('.cbi-value-description');if(description)webServerHelp(description);return node;};
   o=choice(advanced,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
@@ -174,7 +198,7 @@ return view.extend({
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},(k,v)=>k==='at'&&typeof v==='number'?new Date(v*1000).toISOString():v,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');
   disclaimer.render=()=>E('div',{'class':'cbi-section','data-tab':'disclaimer','data-tab-title':disclaimer.title},warning.page(this.disclaimer));
-  const node=await m.render();node.append(E('link',{rel:'stylesheet',href:L.resource('home-controller-help.css')+'?v=025'}));
+  const node=await m.render();node.append(service,E('link',{rel:'stylesheet',href:L.resource('home-controller-help.css')+'?v=025'}));
   this.disclaimerActive=!!node.querySelector('.cbi-map-tabbed > [data-tab="disclaimer"][data-tab-active="true"]');
   for(const pane of node.querySelectorAll('.cbi-map-tabbed > [data-tab]'))pane.addEventListener('cbi-tab-active',()=>{this.disclaimerActive=pane.dataset.tab==='disclaimer';if(this.footer)this.footer.hidden=this.disclaimerActive;});
   if(this.footer)this.footer.hidden=this.disclaimerActive;
@@ -187,7 +211,10 @@ return view.extend({
  },
  async saveConfiguration(activate){
   if(!this.map||this.saving)return;this.saving=true;tell(this.saveMessage,activate?'Applying…':'Saving…');
-  try{await this.map.save(null,true);const c=configuration(this.map,this.original);result(await (activate?apply:stage)(JSON.stringify(c)));this.original=c;tell(this.saveMessage,activate?'Settings applied.':'Saved. Use Save & Apply to activate these changes.');}
+  try{await this.map.save(null,true);const c=configuration(this.map,this.original),usb=(this.connectedControllers||[]).find(d=>d.serial===c.preferred_controller),instance=usb?usb.bus+':'+usb.device:'';
+   const response=result(await (activate?apply:stage)(JSON.stringify(c),instance));
+   if(Object.hasOwn(response,'preferred_controller')){c.preferred_controller=response.preferred_controller;this.map.data.set('json','advanced','preferred_controller',c.preferred_controller||'automatic');this.preferredOption?.getUIElement('advanced')?.setValue(c.preferred_controller||'automatic');}
+   this.original=c;tell(this.saveMessage,activate?'Settings applied.':'Saved. Use Save & Apply to activate these changes.');}
   catch(e){tell(this.saveMessage,e.message||String(e),true);}finally{this.saving=false;}
  },
  handleSave(){return this.saveConfiguration(false);},handleSaveApply(){return this.saveConfiguration(true);},

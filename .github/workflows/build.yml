@@ -12,12 +12,14 @@ jobs:
           go-version: '1.27.x'
           cache: false
       - run: go test -race ./...
+      - run: go vet ./...
       - run: |
           python3 scripts/check-source.py
           node tests/check-js.cjs
           node tests/account-ui.cjs
           sh -n scripts/build-apk.sh
           sh -n files/home-controller.init
+          sh -n files/hotplug-usb
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

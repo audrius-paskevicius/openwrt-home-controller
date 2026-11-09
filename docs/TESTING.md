@@ -4,6 +4,31 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.9 connected TellSticks and automatic fallback (2026-11-09)
+
+- General lists connected models, serials, sending/receiving capabilities and the
+  selected transmitter. The duplicate configuration-only Service row is removed.
+  Advanced offers Automatic and currently connected sticks only.
+- Go tests cover explicit preference, sticky automatic selection, fallback,
+  disappearance from active and staged settings, preservation of unrelated edits,
+  reconnect without restored preference, and rejection of stale USB identities.
+  Linux tests also verify radio-lock serialization and symlink rejection.
+- Tests pass on Windows and on the router's ARM Linux CPU. JavaScript/form tests,
+  Go vet, browser layout/disclaimer tests and shell syntax checks pass.
+- Native LuCI was checked in Chrome on the installed router at desktop and
+  390-pixel widths. Both physical sticks appeared with the correct capabilities.
+  Switching between them restarted only the Telldus driver; backend and web PIDs
+  and Scheduler state remained unchanged. The original transmitter and Automatic
+  were restored afterwards.
+- Simulated USB removal/add events on the router cleared the preference without
+  restoring it. Synthetic RPC responses in native LuCI verified option removal,
+  automatic reset and option reappearance. These checks did not physically unplug
+  hardware, and no blind commands were sent; fallback radio transmission is not
+  claimed as physically verified.
+- The signed APK's 35 payload files match their source/build inputs. Package
+  signature, public-source checks and secret scans pass. Router network, firewall,
+  LuCI web-server settings and shared-account credentials were preserved.
+
 ## 0.2.8 readable dates and disclaimer styling (2026-11-09)
 
 - Scheduler previews and session dates use `YYYY-MM-DD HH:mm`. The control tile

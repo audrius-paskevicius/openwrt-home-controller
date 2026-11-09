@@ -1,6 +1,6 @@
 #!/bin/sh
 case "$PRODUCT" in 1781/c30/*|1781/c31/*|1781/0c30/*|1781/0c31/*)
  case "$ACTION" in add|remove)
-  [ -x /etc/init.d/home-controller ] && /etc/init.d/home-controller enabled && /etc/init.d/home-controller reload >/dev/null 2>&1
+  [ -x /usr/bin/home-controller ] && /usr/bin/home-controller usb-change >/dev/null 2>&1
  ;; esac
 ;; esac
