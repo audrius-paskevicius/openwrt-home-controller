@@ -88,7 +88,7 @@ func radioConfig(c Config, selected map[string]string) string {
 		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", selected["serial"])
 	}
 	for _, d := range c.Devices {
-		if d.deviceType() == "switch" {
+		if d.deviceType() == "switch" || d.deviceType() == "dimmer" {
 			fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"arctech\"\n model = \"codeswitch\"\n controller = 1\n parameters {\n house = %q\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.HouseCode, d.Unit)
 			continue
 		}

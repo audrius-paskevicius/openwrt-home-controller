@@ -211,7 +211,7 @@ func validateSharedAccount(user, password string) error {
 	return nil
 }
 func validAction(s string) bool {
-	return s == "up" || s == "stop" || s == "down" || s == "on" || s == "off"
+	return s == "up" || s == "stop" || s == "down" || s == "on" || s == "off" || s == "toggle" || s == "dim"
 }
 func validTime(s string, optional bool) bool {
 	if s == "" {
@@ -546,6 +546,7 @@ func (s *Server) enqueue(target, action, source string) error {
 	if !s.config.supportsAction(target, action) {
 		return errors.New("action is not supported by this target")
 	}
+	dimmer := s.config.targetType(target) == "dimmer"
 	ids := []string{}
 	for _, d := range s.config.Devices {
 		if d.ID == target {
@@ -560,11 +561,26 @@ func (s *Server) enqueue(target, action, source string) error {
 	if len(ids) == 0 {
 		return errors.New("unknown target")
 	}
+	// Toggle operations cannot replace one another: every accepted press matters.
+	// Bound pending presses, checking the whole group before changing any queue.
+	if dimmer {
+		for _, id := range ids {
+			pending := 0
+			for _, queued := range s.queue {
+				if queued.Device == id {
+					pending++
+				}
+			}
+			if pending >= 4 {
+				return errors.New("wait for pending dimmer commands")
+			}
+		}
+	}
 	request := s.beginRequest(target, action, ids)
 	for _, id := range ids {
 		q := []Command{}
 		for _, c := range s.queue {
-			if c.Device != id {
+			if c.Device != id || dimmer {
 				q = append(q, c)
 			} else {
 				s.finishCommand(c, "Superseded", time.Now())
@@ -603,14 +619,16 @@ func (s *Server) send(c Command) error {
 		return errors.New("no TellStick connected")
 	}
 	var id int
+	radioAction := c.Action
 	for _, d := range s.config.Devices {
 		if d.ID == c.Device {
 			id = d.RadioID
+			radioAction = d.radioAction(c.Action)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, e := exec.CommandContext(ctx, "/usr/libexec/home-controller-radio", strconv.Itoa(id), c.Action).CombinedOutput()
+	out, e := exec.CommandContext(ctx, "/usr/libexec/home-controller-radio", strconv.Itoa(id), radioAction).CombinedOutput()
 	if e != nil || strings.TrimSpace(string(out)) != "0" {
 		return errors.New("radio command failed")
 	}

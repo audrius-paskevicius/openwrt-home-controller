@@ -100,6 +100,24 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await page.run('document.querySelectorAll("#scheduler").length'),1);
  await page.call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  assert.equal(await page.run('document.documentElement.scrollWidth<=innerWidth'),true);
+ await page.run('fixture.devices.push({id:"dimmer",name:"Test dimmer",type:"dimmer",state:{}});fixture.groups.push({id:"dimmers",name:"Dimmers",type:"dimmer",devices:["dimmer"]});fixture.control_order=["device:device0","device:dimmer","device:lamp","scheduler"];refresh()');
+ assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=dimmer] button")].map(b=>b.textContent)'),['Toggle','Dim']);
+ assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=dimmers] button")].map(b=>b.textContent)'),['Toggle','Dim']);
+ assert.equal(await page.run('document.querySelector("[data-id=dimmer] .status").textContent'),'State unknown');
+ assert.equal(await page.run('document.querySelector("[data-id=dimmer] .symbol").dataset.symbol'),'lamp');
+ for(const action of ['toggle','dim']){
+  await page.run(`document.querySelector('[data-id=dimmer] .${action}').click()`);
+  assert.deepEqual(await page.run('requests.at(-1).body'),{target:'dimmer',action});
+ }
+ for(const width of [320,390,1280]){
+  await page.call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<650});
+  const heights=await page.run('Object.fromEntries(["device0","dimmer","lamp","dimmers","scheduler"].map(id=>[id,document.querySelector(id==="scheduler"?"#scheduler":"[data-id="+id+"]").getBoundingClientRect().height]))');
+  assert.ok(heights.dimmer<heights.device0-40,JSON.stringify(heights));
+  assert.ok(heights.lamp<heights.device0-40,JSON.stringify(heights));
+  assert.ok(heights.scheduler>=heights.device0-1,JSON.stringify(heights));
+  assert.equal(await page.run('document.documentElement.scrollWidth<=innerWidth'),true);
+ }
+ console.log('PASS: dimmer Toggle/Dim requests and groups; shorter two-button tiles; three-button-height Scheduler');
  console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');
  console.log('PASS: independent group feedback, stable text through requests/queue/polls, accurate partial results');
  console.log('PASS: switch/group On/Off controls, neutral unknown state, schedule labels and singleton scheduler');

@@ -37,7 +37,7 @@ func TestDeviceTypesAndLegacyMigration(t *testing.T) {
 		}
 	}
 	for _, change := range []func(*Config){
-		func(c *Config) { c.Devices[1].Type = "dimmer" },
+		func(c *Config) { c.Devices[1].Type = "unsupported" },
 		func(c *Config) { c.Devices[1].Protocol = "hasta" },
 		func(c *Config) { c.Devices[1].HouseCode = "Q" },
 		func(c *Config) { c.Devices[1].Unit = 0 },

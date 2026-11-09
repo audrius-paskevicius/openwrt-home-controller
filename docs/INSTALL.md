@@ -149,13 +149,22 @@ to Switch. The supported radio profiles are:
 | Type | Radio protocol | House code | Unit |
 | --- | --- | --- | --- |
 | Switch | Arctech code switch | A–P | 1–16 |
+| Dimmer (Everspring BH004) | Arctech code switch | A–P | 1–16 |
 | Blind | Hasta selflearningv2 | 1–65535 | 0–15 |
 
 The Switch profile supports compatible receivers such as the tested Everspring
 BH002; a shared radio frequency alone does not establish protocol compatibility.
-Dimmer is a disabled placeholder, not an implemented brightness or dimming control.
+Dimmer supports the Everspring BH004: **Toggle** changes power on/off; **Dim**
+starts or stops its brightness cycle while the lamp is on. There is no absolute
+brightness command or state feedback. Status reports the command sent, not the
+lamp's actual power or brightness. Scheduler can run Toggle or Dim on a dimmer
+or dimmer group. Toggle changes the current power state; it does not guarantee
+On or Off. Dim requires the lamp to be on and starts/stops its brightness cycle. Each accepted press is sent in order, with
+a maximum of four queued presses per dimmer; further requests must wait.
+Two-button device/group tiles use their natural, shorter height. Scheduler retains
+the height of a three-button tile.
 Groups must contain devices of one type and inherit that type's buttons. Nested
-groups, mixed Switch/Blind groups and duplicate members are rejected.
+groups, mixed device-type groups and duplicate members are rejected.
 There is exactly one built-in Scheduler card. It can be reordered and its symbol
 changed, but it cannot be added again or removed. Existing rows retain their type;
 add a new row to configure a different kind of control.

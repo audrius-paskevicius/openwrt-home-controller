@@ -4,6 +4,31 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.3.1 BH004 dimmer controls and compact tiles (2026-11-09)
+
+- Physical BH004 trials confirmed that the Arctech code-switch Off signal toggles
+  power in both directions, and On starts/stops brightness cycling while lit.
+  The application exposes those signals as Toggle and Dim without claiming state
+  feedback or absolute brightness. Another receiver did not respond; no broader
+  receiver compatibility is claimed.
+- Go tests cover semantic-to-radio mapping, supported actions, authenticated API
+  access, address privacy, Toggle/Dim schedules, rejected absolute On/Off actions,
+  preserved press order, bounded queues and atomic rejection of full group queues.
+  Tests also pass on the router's ARM processor; Go vet passes.
+- Form and native LuCI modal checks confirm Dimmer is selectable, no extra
+  Scheduler can be added, and schedule actions follow the selected target.
+  Serialization preserves letter addresses and dimmer group membership.
+- Browser tests cover Toggle/Dim requests and groups, shorter two-button tiles,
+  a Scheduler at least as tall as a three-button tile, and no horizontal overflow
+  at phone and desktop widths. Existing status, account and disclaimer checks pass.
+- The signed APK's 35 payload files match source/build inputs. The C helper and
+  Telldus driver are unchanged. Installed assets were checked under production
+  CSP using synthetic state with control writes blocked.
+- Installation preserved configuration, credentials, Scheduler state, network,
+  firewall and LuCI settings. A dimmer was then added through the existing
+  administrator RPC, preserving all prior configuration fields. No schedules or
+  extra physical radio commands were created by deployment.
+
 ## 0.3.0 Switch and Blind device types (2026-11-09)
 
 - Added Arctech code-switch On/Off controls alongside Hasta blinds. Legacy devices

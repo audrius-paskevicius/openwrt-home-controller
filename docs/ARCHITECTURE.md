@@ -148,22 +148,29 @@ No physical position feedback is available: a successful send is not a position 
 
 ## Commands and schedules
 
-Device `type` selects Blind or Switch behavior; a missing type means Blind for
+Device `type` selects Blind, Switch or BH004 Dimmer behavior; a missing type means Blind for
 older configurations. `protocol` is restricted to Hasta for blinds and Arctech
-for switches, with the corresponding fixed driver models `selflearningv2` and
-`codeswitch`. Blinds retain numeric `house`; switches use an A–P `house_code`
+for switches/dimmers, with the corresponding fixed driver models `selflearningv2` and
+`codeswitch`. Blinds retain numeric `house`; switches/dimmers use an A–P `house_code`
 and zero numeric `house`. Unit ranges are validated separately. No arbitrary
 protocol strings or radio-helper operations are accepted.
 
 Groups derive their type from members and require distinct devices of one type.
 Configuration validation checks schedule actions against targets; the command API,
 queue and sender also reject incompatible actions. Public state exposes device/group
-types, not radio addresses or protocol configuration. Dimmer is reserved but rejected
-by validation. Scheduler is one built-in card and one scheduler engine, independent
+types, not radio addresses or protocol configuration. BH004 Toggle maps to the
+driver's Off signal; Dim maps to its On signal, starting/stopping brightness
+cycling while powered on. This mapping occurs only after type/action validation;
+logs retain Toggle/Dim semantics. No state or brightness is inferred. Dimmers
+and their groups support scheduled Toggle/Dim, with identical semantics to the
+manual buttons. Absolute On/Off and brightness values remain unsupported. Scheduler is one built-in card and one scheduler engine, independent
 of the number of schedule rules.
 
 One queue handles all control and scheduled commands. A newer command replaces a
-queued command for the same device. Stop is placed before other queued movement.
+queued command for the same blind/switch. Dimmer presses are non-idempotent:
+accepted commands retain FIFO order, with at most four queued presses per device.
+The whole target is checked before enqueueing a group, so a full member queue
+rejects the request without partial sends. Stop is placed before other queued movement.
 An already executing radio call is bounded by a timeout; Stop cannot interrupt a
 packet already being transmitted. Queued commands expire after 30 seconds instead of replaying stale
 movement. Group operations expand to individual device commands and are serialized.

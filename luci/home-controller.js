@@ -16,10 +16,12 @@ const sessions=rpc.declare({object:'home-controller',method:'sessions',expect:{}
 const tls=rpc.declare({object:'home-controller',method:'tls',expect:{}});
 const clone=x=>JSON.parse(JSON.stringify(x));
 const symbols={none:'None',blind:'Blind',clock:'Clock',lamp:'Lamp',plug:'Plug',fan:'Fan'};
-const kinds={switch:'Switch',dimmer:'Dimmer (not available yet)',blind:'Blind',group:'Group',scheduler:'Scheduler'};
-const isDevice=d=>d.kind==='blind'||d.kind==='switch';
+const kinds={switch:'Switch',dimmer:'Dimmer',blind:'Blind',group:'Group',scheduler:'Scheduler'};
+const isDevice=d=>['blind','switch','dimmer'].includes(d.kind);
+const isCodeSwitch=d=>d.kind==='switch'||d.kind==='dimmer';
+const defaultSymbol=kind=>kind==='dimmer'?'lamp':kind==='switch'?'plug':'blind';
 const deviceKind=d=>d.type||'blind';
-const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off'};
+const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim'};
 const events={time:'Fixed time',sunrise:'Sunrise',sunset:'Sunset',dawn:'Civil dawn',dusk:'Civil dusk'};
 const weekdays={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'};
 function result(r){if(r.error)throw Error(r.error);return r;}
@@ -65,8 +67,8 @@ function command(section,name,title,caption,handler){
  };return o;
 }
 function model(c){
- const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',icon:d.icon||(deviceKind(d)==='switch'?'plug':'blind')})),
-  {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||(c.devices.find(d=>d.id===g.devices[0])?.type==='switch'?'plug':'blind')}))];
+ const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',icon:d.icon||defaultSymbol(deviceKind(d))})),
+  {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||defaultSymbol(c.devices.find(d=>d.id===g.devices[0])?.type)}))];
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
   schedule:c.schedules.map((s,i)=>({...s,enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
@@ -77,7 +79,7 @@ function configuration(m,original){
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
  c.port=Number(m.data.get('json','access','port'));c.networks=list(m.data.get('json','access','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
  c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
- c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:d.kind==='switch'?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(d.kind==='switch'?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
+ c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:isCodeSwitch(d)?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(isCodeSwitch(d)?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
  c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,days:list(s.days).map(Number),event:s.event,
@@ -134,15 +136,14 @@ return view.extend({
   controls.hidetitle=true;controls.anonymous=true;controls.addremove=true;controls.sortable=true;controls.nodescriptions=true;controls.addbtntitle='Add device or group';controls.modaltitle=sid=>kinds[m.data.get('json',sid,'kind')]||'New control';
   let o=value(controls,'name','Name','maxlength(80)');o.validate=(_sid,v)=>v.trim()?true:'Enter a name.';
   const typeOption=choice(controls,form.ListValue,'kind','Type',kinds);
-  typeOption.validate=(_sid,v)=>v==='dimmer'?'Dimmer support is not available yet.':true;
-  typeOption.renderWidget=async function(...args){const node=await form.ListValue.prototype.renderWidget.apply(this,args);const placeholder=node.querySelector('option[value="dimmer"]');if(placeholder)placeholder.disabled=true;return node;};
   choice(controls,form.ListValue,'icon','Symbol',symbols);
+  o=dummy(controls,'_dimmer_help','Dimmer',()=> 'Everspring BH004: Toggle changes power. Dim starts or stops the brightness cycle while on. The same actions can be scheduled. Toggle changes the current power state; Dim requires the lamp to be on. No state or brightness feedback.');o.modalonly=true;o.depends('kind','dimmer');
   o=value(controls,'house','House code','and(uinteger,range(1,65535))','Hasta selflearningv2 radio address.');o.modalonly=true;o.depends('kind','blind');
   o=choice(controls,form.ListValue,'blind_protocol','Radio protocol',{hasta:'Hasta selflearningv2'});o.modalonly=true;o.depends('kind','blind');o.default='hasta';
-  o=choice(controls,form.ListValue,'switch_protocol','Radio protocol',{arctech:'Arctech code switch'});o.modalonly=true;o.depends('kind','switch');o.default='arctech';
-  o=choice(controls,form.ListValue,'house_code','House code',Object.fromEntries('ABCDEFGHIJKLMNOP'.split('').map(x=>[x,x])));o.modalonly=true;o.depends('kind','switch');o.default='A';
-  o=value(controls,'unit','Unit','and(uinteger,range(0,16))');o.modalonly=true;o.depends('kind','blind');o.depends('kind','switch');
-  o.validate=function(sid,v){const kind=this.section.getOption('kind').formvalue(sid),n=Number(v);return Number.isInteger(n)&&n>=(kind==='switch'?1:0)&&n<=(kind==='switch'?16:15)?true:kind==='switch'?'Use unit 1 to 16.':'Use unit 0 to 15.';};
+  o=choice(controls,form.ListValue,'switch_protocol','Radio protocol',{arctech:'Arctech code switch (BH004 for Dimmer)'});o.modalonly=true;o.depends('kind','switch');o.depends('kind','dimmer');o.default='arctech';
+  o=choice(controls,form.ListValue,'house_code','House code',Object.fromEntries('ABCDEFGHIJKLMNOP'.split('').map(x=>[x,x])));o.modalonly=true;o.depends('kind','switch');o.depends('kind','dimmer');o.default='A';
+  o=value(controls,'unit','Unit','and(uinteger,range(0,16))');o.modalonly=true;o.depends('kind','blind');o.depends('kind','switch');o.depends('kind','dimmer');
+  o.validate=function(sid,v){const kind=this.section.getOption('kind').formvalue(sid),n=Number(v);return Number.isInteger(n)&&n>=(kind!=='blind'?1:0)&&n<=(kind!=='blind'?16:15)?true:kind!=='blind'?'Use unit 1 to 16.':'Use unit 0 to 15.';};
   o=controls.option(form.MultiValue,'devices','Devices','Choose devices of one type.');o.modalonly=true;o.rmempty=false;o.depends('kind','group');
   o.validate=(_sid,v)=>{const ids=list(v),devices=m.data.sections('json','control').filter(d=>ids.includes(d.id));return ids.length&&devices.length===ids.length&&devices.every(isDevice)&&new Set(devices.map(d=>d.kind)).size===1?true:'Choose one or more devices of the same type.';};
   controls.addModalOptions=function(section,sid){
@@ -172,9 +173,9 @@ return view.extend({
   for(const [name,title] of [['earliest','Not before'],['latest','Not after'],['fallback','Fallback time']]){
    o=value(grid,name,title,null,name==='fallback'?'Used when the solar event does not occur. Leave empty to skip that day.':null);o.rmempty=true;o.modalonly=true;o.placeholder='HH:MM';o.validate=(_sid,v)=>!v||/^([01]\d|2[0-3]):[0-5]\d$/.test(v)?true:'Use HH:MM (24-hour time).';Object.keys(events).filter(k=>k!=='time').forEach(k=>o.depends('event',k));
   }
-  const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler'&&x.kind!=='dimmer');
+  const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler');
   const targetKind=id=>{const t=targets().find(x=>x.id===id);return t?.kind==='group'?targets().find(x=>x.id===list(t.devices)[0])?.kind:t?.kind;};
-  const allowedActions=id=>targetKind(id)==='switch'?['on','off']:['up','stop','down'];
+  const allowedActions=id=>targetKind(id)==='dimmer'?['toggle','dim']:targetKind(id)==='switch'?['on','off']:['up','stop','down'];
   const updateActions=(section,sid,target)=>{const a=section.getOption('action'),allowed=allowedActions(target),current=a.formvalue(sid),next=allowed.includes(current)?current:allowed[0];a.keylist=[];a.vallist=[];allowed.forEach(k=>a.value(k,actions[k]));const widget=a.getUIElement(sid),select=typeof document==='undefined'?null:document.querySelector('[id="'+a.cbid?.(sid)+'"] select');if(select)select.replaceChildren(...allowed.map(k=>E('option',{value:k},actions[k])));widget?.setValue(next);};
   grid.getOption('target').onchange=function(_event,sid,v){updateActions(this.section,sid,v);};
   grid.getOption('action').validate=function(sid,v){return allowedActions(this.section.getOption('target').formvalue(sid)).includes(v)?true:'Choose an action supported by this target.';};

@@ -32,7 +32,8 @@ and account management stay in LuCI.
 
 - Switch On/Off and Blind Up/Stop/Down controls, with groups of one device type.
   No physical position or power-state feedback is available.
-- Dimmer is a disabled placeholder; one built-in Scheduler serves the system.
+- Everspring BH004 dimmers have Toggle and Dim controls; Dim starts/stops the brightness cycle while on. Both actions can be scheduled, without state or brightness feedback.
+- Two-button device/group tiles are shorter; the single built-in Scheduler keeps a three-button tile's height.
 - Steady result messages; group feedback tracks its own commands, independently
   of later individual-device results.
 - Weekly schedules and optional `sunwait` sunrise, sunset, civil dawn and dusk events.

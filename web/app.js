@@ -2,7 +2,7 @@
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
 let disclaimer='',acknowledged=false,warningOpen=false;
 const warningKey='home-controller-disclaimer';
-const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off'};
+const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
 async function api(path,body){
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
@@ -46,7 +46,7 @@ function dateText(value,timeZone,withDate=true){
  if(!withDate)return clock;
  return p.year+'-'+p.month+'-'+p.day+' '+clock;
 }
-function statusText(state,type){if(!state||!state.status)return type==='switch'?'State unknown':'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
+function statusText(state,type){if(!state||!state.status)return type==='switch'||type==='dimmer'?'State unknown':'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
 function groupStatusText(state){
  if(!state?.status)return '';
  const action=labels[state.action]||state.action,time=' · '+dateText(state.at*1000,undefined,false);
@@ -77,11 +77,11 @@ function heading(name,symbol,fallback){
 }
 function card(item,group){
  const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;el.dataset.type=item.type||'blind';
- const title=heading(item.name,item.icon,item.type==='switch'?'plug':'blind');
- const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':item.type==='switch'?'State unknown':'Position unknown';
+ const title=heading(item.name,item.icon,item.type==='dimmer'?'lamp':item.type==='switch'?'plug':'blind');
+ const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':['switch','dimmer'].includes(item.type)?'State unknown':'Position unknown';
  const buttons=document.createElement('div');buttons.className='buttons';
- for(const action of item.type==='switch'?['on','off']:['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);
-  button.onclick=async()=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';el.setAttribute('aria-busy','true');try{await api('command',{target:item.id,action});if(request===el.request){put($('message'),'');setTimeout(refresh,700);}}catch(e){if(request===el.request){el.classList.add('error');put(status,e.message);}}finally{if(request===el.request){delete el.dataset.busy;el.removeAttribute('aria-busy');}}};buttons.append(button);}
+ for(const action of item.type==='dimmer'?['toggle','dim']:item.type==='switch'?['on','off']:['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);if(action==='dim')button.title='Start or stop changing brightness while the lamp is on';if(action==='toggle')button.title='Toggle power on or off';
+  button.onclick=async()=>{if(item.type==='dimmer'&&el.dataset.busy)return;revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';el.setAttribute('aria-busy','true');try{await api('command',{target:item.id,action});if(request===el.request){put($('message'),'');setTimeout(refresh,700);}}catch(e){if(request===el.request){el.classList.add('error');put(status,e.message);}}finally{if(request===el.request){delete el.dataset.busy;el.removeAttribute('aria-busy');}}};buttons.append(button);}
  el.append(title,status,buttons);return el;
 }
 function schedulerCard(symbol){
