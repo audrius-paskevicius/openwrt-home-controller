@@ -4,6 +4,30 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.3.0 Switch and Blind device types (2026-11-09)
+
+- Added Arctech code-switch On/Off controls alongside Hasta blinds. Legacy devices
+  load as Blinds. Tests cover both address ranges, wrong protocols/actions, mixed
+  or duplicate group members, switch schedules and generated Telldus configuration.
+- Browser tests verify switch/group buttons, schedule labels, stable feedback and
+  the singleton Scheduler. Form tests cover serialization, type-specific unit
+  validation, compatible group membership and changing schedule action choices.
+- Native LuCI modal checks used synthetic, unsaved configuration: Dimmer is visibly
+  disabled, a second Scheduler is unavailable, and schedule action choices change
+  between On/Off and Up/Stop/Down when the target changes.
+- The new C radio helper was built with the OpenWrt SDK in CI. Go tests pass locally
+  and on ARM Linux, alongside Go vet, browser/disclaimer checks and source checks.
+  Public API tests cover switch authorization, action validation and address privacy.
+- The signed package's 35 payload files match source/build inputs. The driver is
+  unchanged. A BH002 receiver's On command was physically confirmed during protocol
+  identification; Off and BH004 dimming are not claimed as physically verified.
+  No dimmer implementation is included.
+- Installed 0.3.0 on the development router and added a Switch through the existing
+  administrator RPC. All prior configuration fields were preserved, with only the
+  new device and its control-order entry added. Credential, Scheduler-state and
+  network/firewall/LuCI hashes were unchanged. Installed control assets passed
+  desktop/phone checks under production CSP with synthetic state and writes blocked.
+
 ## 0.2.11 documentation and packaging audit (2026-11-09)
 
 - Checked the current guides against LuCI form/model code, control rendering,

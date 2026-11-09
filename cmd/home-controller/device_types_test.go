@@ -95,3 +95,32 @@ func TestSwitchCommandsAndSchedules(t *testing.T) {
 		t.Fatal("switch schedule accepted for blind")
 	}
 }
+
+func TestSwitchAPIValidationAndPrivacy(t *testing.T) {
+	s := testServer()
+	s.config = typedConfig()
+	tok := strings.Repeat("b", 64)
+	s.sessions = []Session{{Hash: hash(tok), CSRF: "csrf", Expires: time.Now().Add(time.Hour).Unix(), Revision: "revision"}}
+	headers := map[string]string{"Cookie": cookieName + "=" + tok, "Content-Type": "application/json", "Authorization": "Bearer csrf"}
+	w := request(s, "GET", "/api/state", "", headers)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"type":"switch"`) {
+		t.Fatal(w.Body)
+	}
+	for _, field := range []string{"house", "house_code", "radio_id", "protocol"} {
+		if strings.Contains(w.Body.String(), `"`+field+`"`) {
+			t.Fatal("private field exposed", field)
+		}
+	}
+	if request(s, "POST", "/api/command", `{"target":"lamp","action":"on"}`, map[string]string{"Content-Type": "application/json"}).Code != 401 {
+		t.Fatal("unauthenticated switch command accepted")
+	}
+	if request(s, "POST", "/api/command", `{"target":"lamp","action":"up"}`, headers).Code != 400 {
+		t.Fatal("wrong action accepted")
+	}
+	if request(s, "POST", "/api/command", `{"target":"lights","action":"off"}`, headers).Code != 202 {
+		t.Fatal("valid switch group command rejected")
+	}
+	if len(s.queue) != 1 || s.queue[0].Action != "off" {
+		t.Fatal(s.queue)
+	}
+}
