@@ -237,8 +237,20 @@ The saved generated key handles reconnection; failed authentication can bootstra
 new client key using the stored printed code. Reconnect clears the generated key and
 restarts Home Controller. A changed printed code creates a different gateway identity,
 so old tile IDs cannot silently select targets on a replacement gateway. Blank code
-keeps the saved code. Gateway address changes are explicit; automatic IP discovery is
-not implemented. A DHCP reservation is useful if the gateway's address changes.
+keeps the saved code. The code field shows eight placeholder stars when a code exists,
+empty otherwise; only a boolean is returned to LuCI, never the saved code or its length.
+
+On initial connection or upgrade, the administrator process records the gateway's MAC
+and DHCP hostname from the router's lease file. At each discovery cycle the backend
+looks for an unexpired lease matching that MAC, then falls back to the saved local
+hostname and finally the previous private address. It refuses an address that the
+lease table assigns to another MAC. Only private non-loopback addresses are accepted,
+and DTLS authentication still verifies the endpoint. An IP change reconnects the
+transport without changing tile identities or invalidating the saved client key.
+No DHCP reservations, router DNS settings or firewall rules are changed. The standard
+OpenWrt `/tmp/dhcp.leases` path is used. If that file is unavailable, hostname resolution
+and the last address remain available. Address or hostname entry stays in Advanced;
+the connection status shows the resolved IP.
 
 Discovery polls devices and groups every 15 seconds and after commands, serialized
 with writes. Remotes are omitted from controllable targets. Group capabilities are the
@@ -250,12 +262,26 @@ there is no rollback or replay. Expired queued commands are not sent.
 Group state is derived from member reports rather than the gateway's potentially stale
 group attributes. Different member values show Mixed, and partial availability is shown
 quietly. UI updates do not replace the tile or change focused/actively edited controls.
-Only committed slider/colour selections send commands. White bulbs use double-width
-three-row tiles and colour bulbs four rows; each row uses the standard 46px button
-height and 8px gap. Plugs retain compact two-button tiles.
+Only committed slider selections send commands. Double-width light tiles keep the
+standard On/Off buttons on the left and vertical sliders on the right. Neutral thumbs
+contain B (brightness), W (white temperature), C (hue) and S (saturation), as supported.
+The sliders span the combined 100px height of the two 46px buttons and their 8px gap.
+There are no rainbow tracks or external labels. Full names and values remain available
+through hover descriptions and accessibility attributes. Plugs stay compact.
+
+The status line shows Off, or On with brightness and a known white temperature, such as
+`On 90% 2750K`. Colour mode omits Kelvin. The gateway does not expose a reliable mode
+flag, so acknowledged W/C/S commands record the mode in the private service-owned
+`state/ikea-modes.json`. Changing hue/saturation/temperature externally invalidates that
+knowledge when a new colour signature is observed; unknown mode omits Kelvin rather
+than displaying a retained temperature as current. White-only bulbs always use white
+mode. During a short post-command settling window, new reports establish the signature.
+Mixed groups avoid a single misleading value.
 
 IKEA actions are On, Off, brightness (0–100%), white temperature (2200–4000 K), and
-colour (#RRGGBB hue/saturation, brightness independent). Brightness >0, white and colour
+colour (#RRGGBB hue/saturation, brightness independent), hue (0–359 degrees), and
+saturation (0–100%). Hue updates preserve saturation; saturation updates preserve hue.
+This applies per member of a mixed group, including scheduled changes. Brightness >0, white and colour
 turn lamps on; brightness 0 turns them off. These semantics are identical for manual
 and scheduled actions. Pending changes coalesce only within the same setting;
 brightness and colour scheduled together are both retained. The scheduler preview and

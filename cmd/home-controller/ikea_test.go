@@ -68,7 +68,11 @@ func TestIKEARouterControlAndRestore(t *testing.T) {
 			return
 		}
 		body := map[string]any{}
-		for _, k := range []string{"5707", "5708", "5851", "5850"} {
+		restoreKeys := []string{"5707", "5708", "5851", "5850"}
+		if rawInt(before, "5709") > 0 && rawInt(before, "5710") > 0 {
+			restoreKeys = []string{"5709", "5710", "5851", "5850"}
+		}
+		for _, k := range restoreKeys {
 			body[k] = before[k]
 		}
 		if err := conn.request(3, path, map[string]any{"3311": []any{body}}, nil); err != nil {
@@ -99,7 +103,8 @@ func TestIKEARouterControlAndRestore(t *testing.T) {
 	for _, test := range []struct {
 		action string
 		value  ActionValue
-	}{{"brightness", ActionValue{Value: intPointer(30)}}, {"color", ActionValue{Color: "#00ff00"}}, {"temperature", ActionValue{Value: intPointer(2700)}}} {
+	}{{"brightness", ActionValue{Value: intPointer(30)}}, {"color", ActionValue{Color: "#00ff00"}}, {"hue", ActionValue{Value: intPointer(240)}}, {"saturation", ActionValue{Value: intPointer(25)}}, {"temperature", ActionValue{Value: intPointer(2700)}}} {
+		target = ikeaDevice(read(), c.Gateway, id)
 		body, e := ikeaPayload(target, test.action, test.value)
 		if e != nil {
 			t.Fatal(e)
@@ -118,6 +123,14 @@ func TestIKEARouterControlAndRestore(t *testing.T) {
 			if after.Color != "#00ff00" {
 				t.Fatal("colour feedback differs", after.Color)
 			}
+		case "hue":
+			if after.Hue == nil || *after.Hue != 240 || after.Saturation == nil || *after.Saturation != 100 {
+				t.Fatalf("hue/saturation feedback differs: colour=%s", after.Color)
+			}
+		case "saturation":
+			if after.Saturation == nil || *after.Saturation != 25 || after.Hue == nil || *after.Hue != 240 || after.Brightness == nil || *after.Brightness != 30 {
+				t.Fatal("saturation changed hue or brightness")
+			}
 		case "temperature":
 			if after.Temperature == nil || *after.Temperature != 2700 {
 				t.Fatal("temperature feedback differs", after.Temperature)
@@ -127,6 +140,68 @@ func TestIKEARouterControlAndRestore(t *testing.T) {
 	}
 }
 func intPointer(v int) *int { return &v }
+
+func TestIKEARouterRestoreOnly(t *testing.T) {
+	if os.Getenv("HC_IKEA_RESTORE_TEST") != "1" {
+		t.Skip("explicit restoration only")
+	}
+	id, err := strconv.Atoi(os.Getenv("HC_IKEA_WRITE_TARGET"))
+	if err != nil || id < 1 {
+		t.Fatal("choose the restoration target")
+	}
+	backup := fmt.Sprintf("/tmp/home-controller-ikea-restore-%d.json", id)
+	var original map[string]json.RawMessage
+	if err = readJSON(backup, &original); err != nil {
+		t.Fatal(err)
+	}
+	var lights []map[string]json.RawMessage
+	json.Unmarshal(original["3311"], &lights)
+	if len(lights) != 1 {
+		t.Fatal("invalid restoration record")
+	}
+	before := lights[0]
+	var c ikeaCredentials
+	if err = readJSON(base+"/ikea/credentials.json", &c); err != nil {
+		t.Fatal(err)
+	}
+	var saved ikeaSession
+	readJSON(base+"/state/ikea-auth.json", &saved)
+	if saved.Key != "" {
+		c.Identity, c.Key = saved.Identity, saved.Key
+	}
+	conn, err := ikeaDial(c.Address, c.Identity, c.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.conn.Close()
+	path := fmt.Sprintf("/15001/%d", id)
+	body := map[string]any{}
+	for _, k := range []string{"5709", "5710", "5851", "5850"} {
+		body[k] = before[k]
+	}
+	if err = conn.request(3, path, map[string]any{"3311": []any{body}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
+	var after map[string]json.RawMessage
+	if err = conn.request(1, path, nil, &after); err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(after["3311"], &lights)
+	ok := true
+	for _, k := range []string{"5707", "5708", "5851", "5850", "5711", "5709", "5710"} {
+		a, b := rawInt(before, k), rawInt(lights[0], k)
+		t.Logf("%s: original=%d restored=%d", k, a, b)
+		if a != b {
+			ok = false
+		}
+	}
+	if !ok {
+		t.Fatal("restoration record retained")
+	}
+	os.Remove(backup)
+	t.Log("Original state restored exactly using xy coordinates")
+}
 func TestIKEAValidationAndScheduling(t *testing.T) {
 	c := exampleConfig()
 	c.Devices = append(c.Devices, ikeaTestDevice())

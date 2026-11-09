@@ -2,7 +2,7 @@
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
 let disclaimer='',acknowledged=false,warningOpen=false;
 const warningKey='home-controller-disclaimer';
-const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour'};
+const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour',hue:'Colour hue',saturation:'Saturation'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
 async function api(path,body){
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
@@ -88,37 +88,47 @@ function card(item,group){
 function ikeaCard(item){
  const info=item.ikea||{},caps=info.capabilities||{},wide=!!caps.brightness;
  const el=document.createElement('article');el.className='card ikea'+(wide?' wide':'')+(info.kind==='group'?' group':'');el.dataset.id=item.id;el.dataset.type='ikea';
+ const body=document.createElement('div');body.className='ikea-body';const main=document.createElement('div');main.className='ikea-main';
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
- const controls=document.createElement('div');controls.className='buttons ikea-controls';
- const power=document.createElement('div');power.className=wide?'power-row':'buttons';
+ const power=document.createElement('div');power.className='buttons';
  const send=async(action,extra={})=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});setTimeout(refresh,700);}catch(e){if(request===el.request){el.dataset.clientError=e.message;put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
- for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}controls.append(power);
- for(const action of ['brightness','temperature','color']){
-  if(!caps[action])continue;
-  const row=document.createElement('label');row.className='ikea-row';const text=document.createElement('span');text.textContent=action==='temperature'?'White':labels[action];
-  const input=document.createElement('input');input.type=action==='color'?'color':'range';input.dataset.action=action;input.setAttribute('aria-label',item.name+': '+labels[action]);
-  const output=document.createElement('output');output.dataset.value=action;
-  if(action==='color'){input.value='#ffffff';input.title='Choose hue and saturation; use Brightness for light level';}
-  else{input.min=action==='brightness'?'0':'2200';input.max=action==='brightness'?'100':'4000';input.step=action==='brightness'?'1':'50';input.value=action==='brightness'?'100':'2700';}
-  const label=()=>input.type==='color'?input.value.toUpperCase():input.value+(action==='brightness'?'%':' K');
-  input.oninput=()=>{put(output,label());input.setAttribute('aria-valuetext',label());};
-  input.onchange=()=>{input.oninput();send(action,action==='color'?{color:input.value}:{value:Number(input.value)});};
-  row.append(text,input,output);controls.append(row);
+ for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}
+ main.append(heading(item.name,item.icon,wide?'lamp':'plug'),status,power);body.append(main);
+ const sliders=document.createElement('div');sliders.className='ikea-sliders';
+ for(const [action,letter,min,max,step,initial] of [['brightness','B',0,100,1,100],['temperature','W',2200,4000,50,2700],['hue','C',0,359,1,0],['saturation','S',0,100,1,100]]){
+  if(!(action==='hue'||action==='saturation'?caps.color:caps[action]))continue;
+  const slider=document.createElement('label');slider.className='ikea-slider';
+  const rail=document.createElement('span');rail.className='slider-rail';rail.setAttribute('aria-hidden','true');
+  const knob=document.createElement('span');knob.className='slider-knob';knob.textContent=letter;rail.append(knob);
+  const input=document.createElement('input');input.type='range';input.dataset.action=action;input.min=min;input.max=max;input.step=step;input.value=initial;
+  input.setAttribute('aria-label',item.name+': '+labels[action]);input.setAttribute('aria-orientation','vertical');
+  input.oninput=()=>paintIKEASlider(input);input.onchange=()=>{paintIKEASlider(input);send(action,{value:Number(input.value)});};
+  slider.append(rail,input);sliders.append(slider);paintIKEASlider(input);
  }
- el.append(heading(item.name,item.icon,wide?'lamp':'plug'),status,controls);renderIKEA(el,item);return el;
+ if(wide)body.append(sliders);el.append(body);renderIKEA(el,item);return el;
+}
+function paintIKEASlider(input,unknown=false){
+ const action=input.dataset.action,value=Number(input.value),text=unknown?'Mixed':value+(action==='temperature'?'K':action==='hue'?'°':'%');
+ input.parentNode.style.setProperty('--position',(value-Number(input.min))/(Number(input.max)-Number(input.min)));
+ input.setAttribute('aria-valuetext',text);input.title=labels[action]+': '+text;
+}
+function ikeaStatusText(live){
+ if(!live.reachable)return 'Unavailable';if(live.power===false)return 'Off';if(live.power!==true)return 'Mixed';
+ let text='On';if(live.brightness>=0&&live.brightness!=null)text+=' '+live.brightness+'%';else if(live.brightness===-1)text+=' · Mixed';
+ if(live.mode==='white'&&live.temperature>0)text+=' '+live.temperature+'K';
+ if(live.partial)text+=' · Some unavailable';return text;
 }
 function renderIKEA(el,item){
  if(!el)return;const live=item.ikea||{},available=!!live.reachable;
- let text=!available?'Unavailable':live.power===true?'On':live.power===false?'Off':'Mixed';if(available&&live.partial)text+=' · Some unavailable';
+ let text=ikeaStatusText(live);
  const failure=item.state?.status&&!['Queued','Sent (position unknown)','Superseded','Schedule cancelled'].includes(item.state.status)?item.state.status:'';
  if(el.dataset.clientError||failure)text=el.dataset.clientError||failure;
  put(el.querySelector('.status'),text);el.classList.toggle('error',!!(el.dataset.clientError||failure));
  el.querySelectorAll('button,input').forEach(input=>{input.disabled=!available;});
- for(const action of ['brightness','temperature','color']){
-  const input=el.querySelector('[data-action="'+action+'"]'),output=el.querySelector('[data-value="'+action+'"]');if(!input||el.dataset.busy||document.activeElement===input)continue;
-  const value=live[action],known=available&&value!=null&&value!==-1&&value!=='mixed';
-  if(known)input.value=String(value);
-  const text=known?(action==='color'?String(value).toUpperCase():value+(action==='brightness'?'%':' K')):available?'Mixed':'—';put(output,text);input.setAttribute('aria-valuetext',text);
+ for(const action of ['brightness','temperature','hue','saturation']){
+  const input=el.querySelector('[data-action="'+action+'"]');if(!input||el.dataset.busy||document.activeElement===input)continue;
+  const value=live[action],known=available&&value!=null&&value!==-1;
+  if(known)input.value=String(value);paintIKEASlider(input,!known);
  }
 }
 function schedulerCard(symbol){
@@ -140,7 +150,7 @@ function renderScheduler(state){
  if(state.running&&state.enabled_schedules)detail='No upcoming event in the next week';
  const at=next.querySelector('time'),hasNext=!!(state.running&&state.next);
  at.hidden=!hasNext;
- if(hasNext){detail='Next: '+state.next.target+' '+(labels[state.next.action]||state.next.action)+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':'%'):state.next.color?' '+state.next.color.toUpperCase():'');put(at,dateText(state.next.at,state.timezone));at.dateTime=state.next.at;at.title=(state.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+state.next.at;}
+ if(hasNext){detail='Next: '+state.next.target+' '+(labels[state.next.action]||state.next.action)+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':state.next.action==='hue'?'°':'%'):state.next.color?' '+state.next.color.toUpperCase():'');put(at,dateText(state.next.at,state.timezone));at.dateTime=state.next.at;at.title=(state.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+state.next.at;}
  put(next.querySelector('.next-event'),detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){

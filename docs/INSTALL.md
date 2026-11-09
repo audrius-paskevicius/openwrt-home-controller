@@ -295,11 +295,14 @@ another application.
 
 ## IKEA Home smart 1
 
-In **Advanced**, enter the TRÅDFRI gateway's private IP address and printed security
+In **Advanced**, enter the TRÅDFRI gateway's local hostname or private IP address and printed security
 code, then **Connect**. With saved credentials, leave the code blank and use
 **Reconnect** if needed. Connection changes apply immediately and restart the service;
 other form edits still use Save / Save & Apply. No IKEA account password is required.
-The service must be enabled to discover targets.
+The service must be enabled to discover targets. Saved codes show placeholder stars;
+an empty code field means no code is saved. The router learns the gateway MAC and
+hostname from DHCP and follows address changes automatically. A reservation is not
+required when the gateway uses this router’s standard DHCP service.
 
 In **Controls → Add device or group**, choose **IKEA**, then an existing device or group.
 The initial name is copied when the name field is empty. Set your preferred name,
@@ -308,7 +311,12 @@ by IKEA Home smart 1. Discovery does not add tiles or rearrange them automatical
 Remotes are not selectable control targets.
 
 Plugs have On/Off. Supported lamps expose brightness, white temperature and colour
-in fixed rows. The scheduler offers the same actions and values. Colour sets hue and
+using neutral vertical sliders marked B, W, C and S beside On/Off. S controls saturation
+and allows pastel colours. The scheduler offers the same actions and values. Colour sets hue and
 saturation; use brightness separately for light level. White/colour and positive
 brightness actions turn lamps on. An unavailable gateway or target leaves its tile in
 place. Credentials stay on the router; protect backups, which include those secrets.
+
+The Controls tab also has an **Open controls** link at the bottom, matching General.
+Light status uses a compact line such as `On 90% 2750K`, or `Off`. Kelvin appears only
+in known white mode, and is omitted for colour or unknown mode.

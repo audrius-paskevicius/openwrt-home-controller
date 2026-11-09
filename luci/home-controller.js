@@ -22,7 +22,7 @@ const isDevice=d=>['blind','switch','dimmer','ikea'].includes(d.kind);
 const isCodeSwitch=d=>d.kind==='switch'||d.kind==='dimmer';
 const defaultSymbol=kind=>kind==='dimmer'?'lamp':kind==='switch'?'plug':'blind';
 const deviceKind=d=>d.type||'blind';
-const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour'};
+const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour',hue:'Colour hue',saturation:'Saturation'};
 const events={time:'Fixed time',sunrise:'Sunrise',sunset:'Sunset',dawn:'Civil dawn',dusk:'Civil dusk'};
 const weekdays=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['0','Sun']];
 function result(r){if(r.error)throw Error(r.error);return r;}
@@ -73,7 +73,7 @@ function model(c){
   {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||defaultSymbol(c.devices.find(d=>d.id===g.devices[0])?.type)}))];
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
-  schedule:c.schedules.map((s,i)=>({...s,brightness:s.action==='brightness'?s.value:100,temperature:s.action==='temperature'?s.value:2700,color:s.color||'#ffffff',enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
+  schedule:c.schedules.map((s,i)=>({...s,brightness:s.action==='brightness'?s.value:100,temperature:s.action==='temperature'?s.value:2700,hue:s.action==='hue'?s.value:0,saturation:s.action==='saturation'?s.value:100,color:s.color||'#ffffff',enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
   scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{port:c.port,networks:c.networks,session_days:c.session_days},advanced:{preferred_controller:c.preferred_controller||'automatic'}};
 }
 function configuration(m,original){
@@ -91,7 +91,7 @@ function configuration(m,original){
  });
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
- c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,...(['brightness','temperature'].includes(s.action)?{value:Number(s.action==='brightness'?s.brightness:s.temperature)}:s.action==='color'?{color:s.color}:{}),days:list(s.days).map(Number),event:s.event,
+ c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,...(['brightness','temperature','hue','saturation'].includes(s.action)?{value:Number(s[s.action])}:s.action==='color'?{color:s.color}:{}),days:list(s.days).map(Number),event:s.event,
   time:s.event==='time'?s.time:'',offset:s.event==='time'?0:Number(s.offset||0),earliest:s.event==='time'?'':s.earliest||'',latest:s.event==='time'?'':s.latest||'',fallback:s.event==='time'?'':s.fallback||''}));
  return c;
 }
@@ -105,7 +105,7 @@ function dateText(value,timeZone,withDate=true){
 }
 function nextText(state){
  if(!state)return 'Waiting for service status';if(!state.running)return 'Stopped';if(!state.enabled_schedules)return 'Running · no schedules enabled';if(!state.next)return 'Running · no event in the next week';
- return 'Running · '+state.next.target+' · '+actions[state.next.action]+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':'%'):state.next.color?' '+state.next.color.toUpperCase():'')+' · '+dateText(state.next.at,state.timezone);
+ return 'Running · '+state.next.target+' · '+actions[state.next.action]+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':state.next.action==='hue'?'°':'%'):state.next.color?' '+state.next.color.toUpperCase():'')+' · '+dateText(state.next.at,state.timezone);
 }
 return view.extend({
  load(){return Promise.all([get().then(result),warning.load()]).then(([data,text])=>({...data,disclaimer:text}));},
@@ -114,9 +114,9 @@ return view.extend({
   this.original=clone(data.config);const m=this.map=new form.JSONMap(model(data.config),'Home Controller');m.tabbed=true;let fresh=data,preferred=null,choiceSignature='';m.ikeaTargets=data.ikea?.targets||[];const ikeaStatus=E('span');
   const s=m.section(form.NamedSection,'general','general','General');s.hidetitle=true;
   const enabled=s.option(form.Flag,'enabled','Enable service','To pause scheduled actions only, use Scheduler on the control page.');enabled.rmempty=false;
-  const service=E('p',{role:'status',hidden:'',class:'alert-message warning'}),controller=E('div'),scheduler=E('span'),links=E('span');
+  const service=E('p',{role:'status',hidden:'',class:'alert-message warning'}),controller=E('div'),scheduler=E('span'),links=E('span'),controlsLinks=E('span');
   dummy(s,'_controller','TellSticks',()=>controller);dummy(s,'_scheduler','Scheduler',()=>scheduler);dummy(s,'_links','Control page',()=>links);
-  const putIKEAStatus=()=>{const i=fresh.ikea;ikeaStatus.textContent=i?.connected?'Connected · '+(i.targets||[]).filter(t=>t.kind==='device').length+' devices, '+(i.targets||[]).filter(t=>t.kind==='group').length+' groups':i?.configured?(i.error||'Connecting…'):'Not connected';};
+  const putIKEAStatus=()=>{const i=fresh.ikea;const codeInput=m.root?.querySelector('input[id$=_ikea_code]');if(codeInput)codeInput.placeholder=i?.code_saved?'********':'';ikeaStatus.textContent=i?.connected?'Connected'+(i.address?' · '+i.address:'')+' · '+(i.targets||[]).filter(t=>t.kind==='device').length+' devices, '+(i.targets||[]).filter(t=>t.kind==='group').length+' groups':i?.configured?(i.error||'Connecting…'):'Not connected';};
   const updateStatus=d=>{
    const previousPreference=fresh.config.preferred_controller||'automatic';
    fresh=d;m.ikeaTargets=d.ikea?.targets||[];putIKEAStatus();this.connectedControllers=d.controllers||[];const active=d.active_config||d.config;service.hidden=true;service.textContent='';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
@@ -139,10 +139,11 @@ return view.extend({
     preferred.getUIElement('advanced')?.setValue(Object.hasOwn(choices,next)?next:'automatic');
     choiceSignature=signature;
    }
-   const address=d.access?.listeners?.[0];links.replaceChildren(address?E('a',{href:'https://'+address+'/',target:'_blank',rel:'noopener'},'Open controls'):'Unavailable while the service is stopped');
+   const address=d.access?.listeners?.[0];for(const node of [links,controlsLinks])node.replaceChildren(address?E('a',{href:'https://'+address+'/',target:'_blank',rel:'noopener'},'Open controls'):'Unavailable while the service is stopped');
   };updateStatus(data);
   poll.add(()=>{if(!m.root?.isConnected)return;return get().then(result).then(updateStatus).catch(()=>{service.textContent='Unable to refresh status';service.hidden=false;});},3);
   const controls=m.section(form.GridSection,'control','Controls','Drag rows to arrange the control page. Devices, groups, and Scheduler can appear in any order.');
+  const renderControls=controls.render;controls.render=function(...args){return Promise.resolve(renderControls.apply(this,args)).then(node=>{node.append(E('div',{class:'cbi-section-descr'},controlsLinks));return node;});};
   controls.hidetitle=true;controls.anonymous=true;controls.addremove=true;controls.sortable=true;controls.nodescriptions=true;controls.addbtntitle='Add device or group';controls.modaltitle=sid=>kinds[m.data.get('json',sid,'kind')]||'New control';
   let o=value(controls,'name','Name','maxlength(80)');o.validate=(_sid,v)=>v.trim()?true:'Enter a name.';
   const typeOption=choice(controls,form.ListValue,'kind','Type',kinds);
@@ -184,6 +185,8 @@ return view.extend({
   choice(grid,form.ListValue,'target','Device or group',{});choice(grid,form.ListValue,'action','Action',actions);
   o=value(grid,'brightness','Brightness (%)','and(uinteger,range(0,100))','Sets brightness and turns the light on; 0 turns it off.');o.modalonly=true;o.default='100';o.depends('action','brightness');
   o=value(grid,'temperature','White temperature (K)','and(uinteger,range(2200,4000))','Sets white temperature and turns the light on.');o.modalonly=true;o.default='2700';o.depends('action','temperature');
+  o=value(grid,'hue','Colour hue (degrees)','and(uinteger,range(0,359))');o.modalonly=true;o.default='0';o.depends('action','hue');
+  o=value(grid,'saturation','Saturation (%)','and(uinteger,range(0,100))');o.modalonly=true;o.default='100';o.depends('action','saturation');
   o=value(grid,'color','Colour',null,'Sets the colour and turns the light on. Brightness can be scheduled separately.');o.modalonly=true;o.default='#ffffff';o.depends('action','color');o.validate=(_sid,v)=>/^#[0-9a-fA-F]{6}$/.test(v)?true:'Use a colour such as #ff8000.';
   o.renderWidget=function(sid,index,value){return E('input',{id:this.cbid(sid),class:'cbi-input-text',type:'color',value:value||'#ffffff'});};o.formvalue=function(sid){return document.getElementById(this.cbid(sid))?.value||this.cfgvalue(sid);};
   o=choice(grid,form.ListValue,'event','When',events);o.textvalue=function(sid){const s=m.data.get('json',sid);return events[s.event]+(s.event!=='time'&&Number(s.offset)?' '+(s.offset>0?'+':'−')+Math.abs(s.offset)+' min':'');};
@@ -196,15 +199,15 @@ return view.extend({
   const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler');
   const targetKind=id=>{const t=targets().find(x=>x.id===id);return t?.kind==='group'?targets().find(x=>x.id===list(t.devices)[0])?.kind:t?.kind;};
   const ikeaCaps=id=>{const t=targets().find(x=>x.id===id);return (m.ikeaTargets||[]).find(x=>x.kind+':'+x.id===t?.ikea_target)?.capabilities||t?.ikea?.capabilities||{};};
-  const allowedActions=id=>targetKind(id)==='ikea'?['on','off',...['brightness','temperature','color'].filter(k=>ikeaCaps(id)[k])]:targetKind(id)==='dimmer'?['toggle','dim']:targetKind(id)==='switch'?['on','off']:['up','stop','down'];
+  const allowedActions=id=>targetKind(id)==='ikea'?['on','off',...['brightness','temperature','color','hue','saturation'].filter(k=>ikeaCaps(id)[['hue','saturation'].includes(k)?'color':k])]:targetKind(id)==='dimmer'?['toggle','dim']:targetKind(id)==='switch'?['on','off']:['up','stop','down'];
   const updateActions=(section,sid,target)=>{const a=section.getOption('action'),allowed=allowedActions(target),current=a.formvalue(sid),next=allowed.includes(current)?current:allowed[0];a.keylist=[];a.vallist=[];allowed.forEach(k=>a.value(k,actions[k]));const widget=a.getUIElement(sid),select=typeof document==='undefined'?null:document.querySelector('[id="'+a.cbid?.(sid)+'"] select');if(select)select.replaceChildren(...allowed.map(k=>E('option',{value:k},actions[k])));widget?.setValue(next);};
   grid.getOption('target').onchange=function(_event,sid,v){updateActions(this.section,sid,v);};
   grid.getOption('action').validate=function(sid,v){return allowedActions(this.section.getOption('target').formvalue(sid)).includes(v)?true:'Choose an action supported by this target.';};
   for(const section of [controls,grid])section.renderMoreOptionsModal=async function(...args){await m.parse();return form.GridSection.prototype.renderMoreOptionsModal.apply(this,args);};
   grid.addModalOptions=function(section,sid){const t=section.getOption('target');t.keylist=[];t.vallist=[];targets().forEach(d=>t.value(d.id,d.name));const a=section.getOption('action');a.keylist=[];a.vallist=[];allowedActions(m.data.get('json',sid,'target')).forEach(k=>a.value(k,actions[k]));};
-  grid.getOption('action').textvalue=function(sid){const d=m.data.get('json',sid);return actions[d.action]+(d.action==='brightness'?' '+d.brightness+'%':d.action==='temperature'?' '+d.temperature+' K':d.action==='color'?' '+d.color:'');};
+  grid.getOption('action').textvalue=function(sid){const d=m.data.get('json',sid);return actions[d.action]+(d.action==='brightness'?' '+d.brightness+'%':d.action==='temperature'?' '+d.temperature+' K':d.action==='hue'?' '+d.hue+'°':d.action==='saturation'?' '+d.saturation+'%':d.action==='color'?' '+d.color:'');};
   grid.getOption('target').textvalue=function(sid){return targets().find(x=>x.id===m.data.get('json',sid,'target'))?.name||'Missing device';};
-  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:allowedActions(targets()[0]?.id)[0],brightness:100,temperature:2700,color:'#ffffff',days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
+  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:allowedActions(targets()[0]?.id)[0],brightness:100,temperature:2700,hue:0,saturation:100,color:'#ffffff',days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
   value(scheduling,'timezone','Time zone',null,'Use “router” to follow the router’s time zone.').value('router','Follow router');
   value(scheduling,'latitude','Latitude','range(-90,90)');value(scheduling,'longitude','Longitude','range(-180,180)');
   dummy(scheduling,'_sunwait','Solar schedules',()=>data.sunwait?'Sunwait is installed':'Install sunwait to use sunrise, sunset, dawn, and dusk.');
@@ -233,8 +236,8 @@ return view.extend({
    'Used for sending. If unplugged, the setting returns to Automatic. Reconnecting the stick does not restore the preference.');
   this.preferredOption=preferred;
   dummy(advanced,'_ikea_status','IKEA gateway',()=>ikeaStatus);
-  const ikeaAddress=value(advanced,'_ikea_address','Gateway address',null,'Private IP address of the TRÅDFRI gateway.');ikeaAddress.rmempty=true;ikeaAddress.cfgvalue=()=>fresh.ikea?.address||'';ikeaAddress.write=ikeaAddress.remove=()=>{};
-  const ikeaCode=value(advanced,'_ikea_code','Gateway security code',null,'Stored privately on this router for automatic reconnection. Leave blank to keep the saved code.');ikeaCode.password=true;ikeaCode.rmempty=true;ikeaCode.cfgvalue=()=>'';ikeaCode.write=ikeaCode.remove=()=>{};
+  const ikeaAddress=value(advanced,'_ikea_address','Gateway address',null,'Tracks this gateway through its MAC address and local DHCP hostname. A local hostname or private IP can be entered.');ikeaAddress.rmempty=true;ikeaAddress.cfgvalue=()=>fresh.ikea?.hostname||fresh.ikea?.address||'';ikeaAddress.write=ikeaAddress.remove=()=>{};
+  const ikeaCode=value(advanced,'_ikea_code','Gateway security code',null,'Stored privately on this router for automatic reconnection. Leave blank to keep the saved code.');ikeaCode.password=true;ikeaCode.placeholder=data.ikea?.code_saved?'********':'';ikeaCode.rmempty=true;ikeaCode.cfgvalue=()=>'';ikeaCode.write=ikeaCode.remove=()=>{};
   command(advanced,'_ikea_connect','IKEA connection',data.ikea?.configured?'Reconnect':'Connect',async()=>{result(await ikeaConnect(ikeaAddress.formvalue('advanced')?.trim()||'',ikeaCode.formvalue('advanced')||''));ikeaCode.getUIElement('advanced')?.setValue('');return 'Connection settings saved. Home Controller is reconnecting.';});
 
   preferred.validate=(_sid,v)=>v==='automatic'||(fresh.controllers||[]).some(usb=>usb.serial===v)?true:'Select Automatic or a connected TellStick.';

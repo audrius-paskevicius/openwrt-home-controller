@@ -35,7 +35,7 @@ func (c IKEACapabilities) supports(action string) bool {
 		return c.Brightness
 	case "temperature":
 		return c.Temperature
-	case "color":
+	case "color", "hue", "saturation":
 		return c.Color
 	}
 	return false
@@ -48,6 +48,12 @@ type IKEATarget struct {
 	Capabilities IKEACapabilities `json:"capabilities"`
 }
 type IKEATargetInfo struct {
+	rawHue         int
+	rawSaturation  int
+	Hue            *int   `json:"hue,omitempty"`
+	Saturation     *int   `json:"saturation,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	colorSignature string
 	IKEATarget
 	Name        string `json:"name"`
 	Model       string `json:"model,omitempty"`
@@ -60,6 +66,9 @@ type IKEATargetInfo struct {
 	Members     []int  `json:"members,omitempty"`
 }
 type IKEAStatus struct {
+	CodeSaved  bool             `json:"code_saved"`
+	Hostname   string           `json:"hostname,omitempty"`
+	MAC        string           `json:"mac,omitempty"`
 	Configured bool             `json:"configured"`
 	Connected  bool             `json:"connected"`
 	Address    string           `json:"address,omitempty"`
@@ -68,6 +77,8 @@ type IKEAStatus struct {
 	Targets    []IKEATargetInfo `json:"targets"`
 }
 type ikeaCredentials struct {
+	MAC      string `json:"mac,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
 	Address  string `json:"address"`
 	Gateway  string `json:"gateway_id"`
 	Identity string `json:"identity,omitempty"`
@@ -85,12 +96,15 @@ type ikeaManager struct {
 	status                                   IKEAStatus
 	conn                                     *ikeaTransport
 	fingerprint                              string
+	address                                  string
+	modes                                    map[string]ikeaMode
+	modesPath                                string
 	credentialsPath, sessionPath, statusPath string
 	wake                                     chan bool
 }
 
 func newIKEA() *ikeaManager {
-	return &ikeaManager{credentialsPath: base + "/ikea/credentials.json", sessionPath: base + "/state/ikea-auth.json", statusPath: run + "/ikea.json", wake: make(chan bool, 1)}
+	return &ikeaManager{credentialsPath: base + "/ikea/credentials.json", sessionPath: base + "/state/ikea-auth.json", statusPath: run + "/ikea.json", wake: make(chan bool, 1), modesPath: base + "/state/ikea-modes.json"}
 }
 func (m *ikeaManager) snapshot() IKEAStatus { m.mu.RLock(); defer m.mu.RUnlock(); return m.status }
 func (m *ikeaManager) publish(v IKEAStatus) {
@@ -105,17 +119,23 @@ func (m *ikeaManager) close() {
 		m.conn = nil
 	}
 }
-func (m *ikeaManager) connect(c ikeaCredentials, fingerprint string) error {
+func (m *ikeaManager) connect(c ikeaCredentials, fingerprint, legacyFingerprint string) error {
 	var saved ikeaSession
 	readJSON(m.sessionPath, &saved)
 	identity, key := c.Identity, c.Key
-	if saved.Fingerprint == fingerprint {
+	if saved.Fingerprint == fingerprint || saved.Fingerprint == legacyFingerprint {
 		identity, key = saved.Identity, saved.Key
 	}
 	if identity != "" && key != "" {
 		t, err := ikeaDial(c.Address, identity, key)
 		if err == nil {
 			m.conn = t
+			if saved.Fingerprint != fingerprint {
+				if err := atomicJSON(m.sessionPath, ikeaSession{fingerprint, identity, key}); err != nil {
+					m.close()
+					return errors.New("could not save IKEA connection credentials")
+				}
+			}
 			return nil
 		}
 	}
@@ -151,7 +171,7 @@ func (m *ikeaManager) refresh() {
 		m.publish(IKEAStatus{Targets: []IKEATargetInfo{}})
 		return
 	}
-	fingerprint := hash(c.Address + "\x00" + c.Gateway + "\x00" + c.Code + "\x00" + c.Key)
+	fingerprint := ikeaFingerprint(c)
 	if m.fingerprint != fingerprint {
 		m.close()
 		m.fingerprint = fingerprint
@@ -159,11 +179,26 @@ func (m *ikeaManager) refresh() {
 	}
 	state := m.snapshot()
 	state.Configured = true
-	state.Address = c.Address
+	state.CodeSaved = c.Code != ""
+	state.Hostname = c.Hostname
+	state.MAC = c.MAC
 	state.Gateway = c.Gateway
 	fail := func(err error) { m.close(); state.Connected = false; state.Error = err.Error(); m.publish(state) }
+	address, err := resolveIKEAGateway(c, currentIKEALeases(), lookupIKEAHost)
+	if err != nil {
+		fail(err)
+		return
+	}
+	if m.address != address {
+		m.close()
+		m.address = address
+	}
+	state.Address = address
+	// Keep the saved address for old session-fingerprint migration until needed.
+	resolved := c
+	resolved.Address = address
 	if m.conn == nil {
-		if err := m.connect(c, fingerprint); err != nil {
+		if err := m.connect(resolved, fingerprint, hash(c.Address+"\x00"+c.Gateway+"\x00"+c.Code+"\x00"+c.Key)); err != nil {
 			fail(err)
 			return
 		}
@@ -173,6 +208,7 @@ func (m *ikeaManager) refresh() {
 		fail(errors.New("IKEA gateway unavailable"))
 		return
 	}
+	m.applyModes(targets)
 	state.Targets = targets
 	state.Connected = true
 	state.Error = ""
@@ -350,13 +386,31 @@ func ikeaDevice(raw map[string]json.RawMessage, gateway string, id int) IKEATarg
 			t.Temperature = &v
 		}
 		if t.Capabilities.Color {
+			t.rawHue = rawInt(d, "5707")
+			t.rawSaturation = rawInt(d, "5708")
+			hue := int(math.Round(float64(rawInt(d, "5707"))/65535*360)) % 360
+			sat := int(math.Round(float64(rawInt(d, "5708")) / 65279 * 100))
+			t.Hue = &hue
+			t.Saturation = &sat
+			t.colorSignature = fmt.Sprintf("%d:%d:%d", rawInt(d, "5707"), rawInt(d, "5708"), rawInt(d, "5711"))
 			t.Color = ikeaHSVHex(float64(rawInt(d, "5707"))/65535*360, float64(rawInt(d, "5708"))/65279)
 		}
+	}
+	if t.Capabilities.Temperature && !t.Capabilities.Color {
+		t.Mode = "white"
 	}
 	return t
 }
 func validateActionValue(action string, v ActionValue) error {
 	switch action {
+	case "hue":
+		if v.Value == nil || *v.Value < 0 || *v.Value > 359 || v.Color != "" {
+			return errors.New("hue must be 0 to 359 degrees")
+		}
+	case "saturation":
+		if v.Value == nil || *v.Value < 0 || *v.Value > 100 || v.Color != "" {
+			return errors.New("saturation must be 0 to 100 percent")
+		}
 	case "brightness":
 		if v.Value == nil || *v.Value < 0 || *v.Value > 100 || v.Color != "" {
 			return errors.New("brightness must be 0 to 100 percent")
@@ -402,6 +456,20 @@ func ikeaPayload(t IKEATargetInfo, action string, v ActionValue) (map[string]any
 	case "temperature":
 		p["5711"] = int(math.Round(1e6 / float64(*v.Value)))
 		p["5850"] = 1
+	case "hue":
+		if t.Saturation == nil {
+			return nil, errors.New("IKEA saturation unavailable")
+		}
+		p["5708"] = t.rawSaturation
+		p["5707"] = int(math.Round(float64(*v.Value) / 360 * 65535))
+		p["5850"] = 1
+	case "saturation":
+		if t.Hue == nil {
+			return nil, errors.New("IKEA hue unavailable")
+		}
+		p["5707"] = t.rawHue
+		p["5708"] = int(math.Round(float64(*v.Value) * 65279 / 100))
+		p["5850"] = 1
 	case "color":
 		h, s := ikeaHexHSV(v.Color)
 		p["5707"] = int(math.Round(h / 360 * 65535))
@@ -446,6 +514,16 @@ func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expi
 				failed++
 				continue
 			}
+			if action == "hue" || action == "saturation" {
+				var raw map[string]json.RawMessage
+				if err := m.conn.request(codes.GET, fmt.Sprintf("/15001/%d", id), nil, &raw); err != nil {
+					return errors.New("could not read current IKEA colour")
+				}
+				t = ikeaDevice(raw, t.Gateway, id)
+				if !t.Reachable {
+					return errors.New("IKEA target unavailable")
+				}
+			}
 			body, err := ikeaPayload(t, action, v)
 			if err != nil {
 				return err
@@ -462,6 +540,7 @@ func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expi
 				return fmt.Errorf("IKEA command failed after %d successful sends", sent)
 			} else {
 				sent++
+				m.recordMode(t, action)
 			}
 		}
 	}
@@ -547,7 +626,12 @@ func ikeaSettings() IKEAStatus {
 	var c ikeaCredentials
 	if readJSON(base+"/ikea/credentials.json", &c) == nil {
 		v.Configured = true
-		v.Address = c.Address
+		if v.Address == "" {
+			v.Address = c.Address
+		}
+		v.CodeSaved = c.Code != ""
+		v.MAC = c.MAC
+		v.Hostname = c.Hostname
 		v.Gateway = c.Gateway
 	}
 	return v
@@ -556,6 +640,12 @@ func prepareIKEACredentials() error {
 	path := base + "/ikea/credentials.json"
 	if !exists(path) {
 		return nil
+	}
+	var c ikeaCredentials
+	if readJSON(path, &c) == nil && pinIKEAGateway(&c, currentIKEALeases()) {
+		if err := atomicJSON(path, c); err != nil {
+			return err
+		}
 	}
 	adminFile(base + "/ikea")
 	if err := os.Chmod(base+"/ikea", 0750); err != nil {
@@ -570,10 +660,17 @@ func saveIKEACredentials(address, code string) error {
 	if address == "" {
 		address = c.Address
 	}
-	ip := net.ParseIP(address)
-	if ip == nil || !ip.IsPrivate() || ip.IsLoopback() {
-		return errors.New("enter the gateway's private IP address")
+	candidate := c
+	candidate.Address = address
+	if address != c.Address && address != c.Hostname {
+		candidate.MAC = ""
+		candidate.Hostname = ""
 	}
+	resolved, err := resolveIKEAGateway(candidate, currentIKEALeases(), lookupIKEAHost)
+	if err != nil {
+		return errors.New("enter a gateway hostname or private IP address that resolves locally")
+	}
+	ip := net.ParseIP(resolved)
 	if code == "" {
 		code = c.Code
 	}
@@ -584,8 +681,18 @@ func saveIKEACredentials(address, code string) error {
 	// from silently controlling a different gateway that reused numeric resource IDs.
 	if c.Gateway == "" || c.Code != code {
 		c.Gateway = "ikea-" + token()[:16]
+		c.MAC = ""
+		c.Hostname = ""
+	}
+	if c.Address != ip.String() && candidate.MAC == "" {
+		c.MAC = ""
+		c.Hostname = ""
 	}
 	c.Address = ip.String()
+	if ikeaHostname(address) {
+		c.Hostname = address
+	}
+	pinIKEAGateway(&c, currentIKEALeases())
 	c.Code = code
 	c.Identity = ""
 	c.Key = ""

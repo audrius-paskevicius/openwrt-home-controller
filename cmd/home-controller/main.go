@@ -216,7 +216,7 @@ func validateSharedAccount(user, password string) error {
 	return nil
 }
 func validAction(s string) bool {
-	return s == "brightness" || s == "temperature" || s == "color" || s == "up" || s == "stop" || s == "down" || s == "on" || s == "off" || s == "toggle" || s == "dim"
+	return s == "hue" || s == "saturation" || s == "brightness" || s == "temperature" || s == "color" || s == "up" || s == "stop" || s == "down" || s == "on" || s == "off" || s == "toggle" || s == "dim"
 }
 func validTime(s string, optional bool) bool {
 	if s == "" {

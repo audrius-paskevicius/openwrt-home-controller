@@ -367,3 +367,33 @@ were verified; reauthentication generated a service-owned private key file using
 stored code. Installed desktop/phone assets were checked under production CSP with
 synthetic state and control writes blocked. No IKEA tiles or schedules were added by
 these checks. Source and extracted payload scans found no deployment credentials.
+
+## IKEA tile and discovery revision (0.4.1)
+
+Added tests for DHCP expiry, MAC pinning, IP reassignment to another device, hostname
+fallback, rejecting public/loopback addresses, stable client-key identity across IP
+changes, and mode invalidation after external colour changes. Hue and saturation
+payload tests ensure each preserves the other setting and brightness.
+
+Chrome tests cover neutral lettered vertical sliders at phone/desktop widths, native
+pointer endpoints, ArrowUp behaviour, commit-only requests, compact white/colour/off
+status and absence of scrolling overflow. Native LuCI checks cover the Controls-tab
+link, placeholder stars with an empty real input, target selection and hue/saturation
+schedule actions. The original 0.4.0 horizontal/four-row layout was superseded.
+
+Physical validation confirmed the new hue and saturation commands preserve each
+other and brightness. The gateway needs paired colour values, so the backend reads
+the current pair before changing one component. Restoration using original xy
+coordinates was verified against the original hue, saturation, brightness, power,
+white temperature and xy reports exactly; this avoids conversion rounding when
+restoring through hue/saturation alone. A separate opt-in restoration test can use
+the retained record with `HC_IKEA_RESTORE_TEST=1` and the selected target ID.
+
+Installed 0.4.1 checks confirmed the MAC/hostname metadata, live discovery, saved-code
+placeholder with an empty real field, both control-page links, and the revised tiles
+under production CSP. The application configuration, scheduler preference, shared
+account and router network/firewall/LuCI settings were unchanged. Gateway code,
+gateway identity, and generated client identity/key were preserved during migration;
+only discovery metadata and the private authentication fingerprint were updated.
+No DHCP lease or network settings were modified to force an address change: movement
+and reassignment are covered by synthetic lease/DNS tests against the same resolver.
