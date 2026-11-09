@@ -4,6 +4,26 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.8 readable dates and disclaimer styling (2026-11-09)
+
+- Scheduler previews and session dates use `YYYY-MM-DD HH:mm`. The control tile
+  puts the timestamp on its own unbroken line without a visible time-zone suffix.
+  Configured schedule zones and browser-local session times are preserved; exact
+  timestamps remain in metadata/hover details and diagnostic JSON.
+- Control-page checks passed at 320, 390, 1280 and 1920 pixels, across US/Arabic
+  locales, midnight, both repeated-hour instants, UTC and fractional/negative
+  offsets. LuCI form checks include readable session dates and precise diagnostics.
+- Home Controller's first-use and permanent notices use the amber Wi-Fi Coordinator
+  styling. Browser checks passed for exact-text persistence, changed-text prompts,
+  blocked storage and read-again access. Canonical project wording is unchanged.
+- All 35 signed APK payload files match source or unchanged backend/radio binaries.
+  Source checks and package signature verification passed. The backend and radio
+  algorithms are unchanged; physical device commands were not exercised.
+- The signed package was installed on the development router. Configuration,
+  credentials and Scheduler state hashes were preserved, and the service resumed.
+  HTTP reads of the installed control page, JavaScript and stylesheets match the
+  verified sources, including the versioned asset URLs.
+
 ## 0.2.7 time display (2026-11-08)
 
 - Control-page tests verify `HH:mm` command times and ISO 8601 date-times with

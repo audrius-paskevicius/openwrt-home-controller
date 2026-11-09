@@ -13,7 +13,7 @@ function accepted(text){
 function fullText(text){return E('div',{},text.trim().split(/\n\s*\n/).map((p,i)=>E(i?'p':'h3',{},p)));}
 return L.Class.extend({
  page:function(text){return E('div',{},[
-  E('link',{rel:'stylesheet',href:L.resource('home-controller-disclaimer.css')+'?v=023'}),
+  E('link',{rel:'stylesheet',href:L.resource('home-controller-disclaimer.css')+'?v=028'}),
   E('h2',{},'Home Controller: disclaimer'),
   E('section',{class:'hc-disclaimer-notice'},fullText(text))
  ]);},
@@ -23,15 +23,17 @@ return L.Class.extend({
  });},
  gate:function(text,render){
   if(accepted(text))return render();
-  const host=E('div',{class:'cbi-map hc-warning'},[E('h2',{},'Home Controller: disclaimer')]);
+  const host=E('div',{class:'cbi-map hc-warning'},[
+   E('link',{rel:'stylesheet',href:L.resource('home-controller-disclaimer.css')+'?v=028'}),
+   E('h2',{},'Home Controller: disclaimer')]);
   const error=E('p',{role:'alert'});
   const button=E('button',{type:'button',class:'cbi-button cbi-button-action',click:async function(){
    button.disabled=true;error.textContent='';acknowledgedText=text;
    try{window.localStorage.setItem(key,text);}catch(e){}
    try{host.replaceChildren(await render());}catch(e){button.disabled=false;error.textContent='Unable to load this page: '+e.message;}
   }},'I understand — continue');
-  host.append(E('div',{class:'cbi-section'},[fullText(text),
-   E('p',{},'Acknowledgement is remembered in this browser for this router. It does not change the running service or scheduler.'),button,error]));
+  host.append(E('section',{class:'hc-disclaimer-notice'},[fullText(text),
+   E('p',{},'Acknowledgement is remembered in this browser for this router while its site data is retained, including after a computer restart. It does not change the running service or scheduler.'),button,error]));
   return host;
  },
  show:function(text){ui.showModal('Home Controller: disclaimer',[fullText(text),E('div',{class:'right'},[

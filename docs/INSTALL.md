@@ -64,6 +64,9 @@ permission. Local requests from the router itself remain permitted.
 Both interfaces show the project disclaimer before first use. Acknowledgement is
 remembered in that browser for the exact text. Changed wording asks again; blocked
 browser storage means acknowledgement lasts only for the current page visit.
+Acknowledgement survives browser and computer restarts while the browser retains
+site data. Clearing site data on exit also clears acknowledgement; allow these
+router sites to retain data if you want the notice remembered.
 LuCI and the control page use separate browser origins, so each asks independently.
 Another hostname, address, port or browser also needs its own acknowledgement.
 Acknowledgement does not start or stop the service or Scheduler. Read the text again

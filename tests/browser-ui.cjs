@@ -28,25 +28,27 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  await page.run('refresh()');
  await page.run('fixture.devices[0].state={action:"up",status:"Sent (position unknown)",at:Date.parse("2026-11-08T21:10:00Z")/1000};refresh()');
  assert.equal(await page.run('document.querySelector("[data-id=device0] .status").textContent'),'Up sent · 22:10');
- assert.match(await page.run('document.querySelector("#scheduler .next").textContent'),/2026-11-09T08:00:00\+01:00$/);
+ assert.match(await page.run('document.querySelector("#scheduler .next time").textContent'),/^2026-11-09 08:00$/);
+ assert.equal(await page.run('document.querySelector("#scheduler time").dateTime'),'2026-11-09T07:00:00Z');
+ assert.equal(await page.run('document.querySelector("#scheduler .next").textContent.includes("Europe/")'),false);
  for(const [instant,zone,want] of [
-  ['2026-11-08T23:00:00Z','Europe/Stockholm','2026-11-09T00:00:00+01:00'],
-  ['2026-10-25T00:30:00Z','Europe/Stockholm','2026-10-25T02:30:00+02:00'],
-  ['2026-10-25T01:30:00Z','Europe/Stockholm','2026-10-25T02:30:00+01:00'],
-  ['2026-11-08T01:00:00Z','America/New_York','2026-11-07T20:00:00-05:00'],
-  ['2026-11-08T00:00:00Z','Asia/Kathmandu','2026-11-08T05:45:00+05:45'],
-  ['2026-11-08T00:00:00Z','UTC','2026-11-08T00:00:00Z']
+  ['2026-11-08T23:00:00Z','Europe/Stockholm','2026-11-09 00:00'],
+  ['2026-10-25T00:30:00Z','Europe/Stockholm','2026-10-25 02:30'],
+  ['2026-10-25T01:30:00Z','Europe/Stockholm','2026-10-25 02:30'],
+  ['2026-11-08T01:00:00Z','America/New_York','2026-11-07 20:00'],
+  ['2026-11-08T00:00:00Z','Asia/Kathmandu','2026-11-08 05:45'],
+  ['2026-11-08T00:00:00Z','UTC','2026-11-08 00:00']
  ])assert.equal(await page.run(`dateText(${JSON.stringify(instant)},${JSON.stringify(zone)})`),want);
  await page.call('Emulation.setLocaleOverride',{locale:'ar-EG'});
  assert.equal(await page.run('dateText("2026-11-08T23:00:00Z",undefined,false)'),'00:00');
- assert.equal(await page.run('dateText("2026-11-08T21:10:00Z")'),'2026-11-08T22:10:00+01:00');
+ assert.equal(await page.run('dateText("2026-11-08T21:10:00Z")'),'2026-11-08 22:10');
  await page.call('Emulation.setLocaleOverride',{locale:'en-US'});
  assert.deepEqual(await page.run('[...document.querySelectorAll("article h2")].map(x=>x.textContent)'),['Kitchen','Kids room','Bedroom','Office','Scheduler','All blinds']);
  assert.equal(await page.run('document.querySelectorAll("header").length'),0);
  for(const width of [320,390,1280,1920]){
   await page.call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<650});
   const layout=await page.run(`({width:innerWidth,scroll:document.documentElement.scrollWidth,bottom:document.querySelector('footer').getBoundingClientRect().bottom,columns:getComputedStyle(document.getElementById('controls')).gridTemplateColumns.split(' ').filter(v=>parseFloat(v)>0).length,buttons:[...document.querySelectorAll('.card:first-child button')].map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent,x:r.x,y:r.y,height:r.height,width:r.width};})})`);
-  assert.ok(layout.scroll<=layout.width,JSON.stringify(layout));assert.deepEqual(layout.buttons.map(b=>b.text),['Up','Stop','Down']);
+  assert.ok(layout.scroll<=layout.width,JSON.stringify(layout));assert.equal(await page.run('getComputedStyle(document.querySelector("#scheduler time")).whiteSpace'),'nowrap');assert.equal(await page.run('document.querySelector("#scheduler time").scrollWidth<=document.querySelector("#scheduler .next").clientWidth'),true);assert.deepEqual(layout.buttons.map(b=>b.text),['Up','Stop','Down']);
   assert.ok(layout.buttons.every(b=>b.height>=44&&b.width>=100),JSON.stringify(layout));assert.equal(layout.buttons[0].x,layout.buttons[2].x);assert.ok(layout.buttons[0].y<layout.buttons[1].y&&layout.buttons[1].y<layout.buttons[2].y);
   assert.equal(layout.buttons[1].y-layout.buttons[0].y-layout.buttons[0].height,8);
   if(width===390)assert.ok(layout.bottom<775,JSON.stringify(layout));

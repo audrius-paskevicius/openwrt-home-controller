@@ -17,7 +17,7 @@ function showWarning(){
  revision++;warningOpen=true;$('login').hidden=true;$('controls').hidden=true;$('logout').hidden=true;document.querySelector('footer').hidden=true;
  const panel=$('warning');panel.replaceChildren();
  disclaimer.trim().split(/\n\s*\n/).forEach((text,i)=>{const p=document.createElement(i?'p':'h1');if(!i)p.id='warning-title';p.textContent=text;panel.append(p);});
- if(!acknowledged){const note=document.createElement('p');note.className='warning-note';note.textContent='Acknowledgement is remembered in this browser for this router. It does not change the running service or scheduler.';panel.append(note);}
+ if(!acknowledged){const note=document.createElement('p');note.className='warning-note';note.textContent='Acknowledgement is remembered in this browser for this router while its site data is retained, including after a computer restart. It does not change the running service or scheduler.';panel.append(note);}
  const button=document.createElement('button');button.type='button';button.textContent=acknowledged?'Back':'I understand — continue';
  button.onclick=()=>{acknowledged=true;try{localStorage.setItem(warningKey,disclaimer);}catch(e){}warningOpen=false;panel.hidden=true;document.querySelector('footer').hidden=false;$('login').hidden=signedIn;$('controls').hidden=!signedIn;$('logout').hidden=!signedIn;refresh();};
  panel.append(button);panel.hidden=false;panel.focus();
@@ -41,11 +41,10 @@ async function initialize(){
 function dateText(value,timeZone,withDate=true){
  const date=new Date(value);if(!Number.isFinite(date.getTime()))return 'Unknown time';
  const parts=new Intl.DateTimeFormat('en-GB',{calendar:'iso8601',numberingSystem:'latn',hourCycle:'h23',
-  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'longOffset',...(timeZone?{timeZone}:{})}).formatToParts(date);
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',...(timeZone?{timeZone}:{})}).formatToParts(date);
  const p=Object.fromEntries(parts.map(x=>[x.type,x.value])),clock=p.hour+':'+p.minute;
  if(!withDate)return clock;
- const offset=p.timeZoneName.replace(/^(GMT|UTC)/,'').replace(/^\+00:00$/,'')||'Z';
- return p.year+'-'+p.month+'-'+p.day+'T'+clock+':'+p.second+offset;
+ return p.year+'-'+p.month+'-'+p.day+' '+clock;
 }
 function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
 const symbolPaths={
@@ -73,6 +72,8 @@ function schedulerCard(symbol){
  const title=heading('Scheduler',symbol,'clock');
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
  const next=document.createElement('p');next.className='next';
+ const event=document.createElement('span'),at=document.createElement('time');
+ event.className='next-event';next.append(event,at);
  const buttons=document.createElement('div');buttons.className='buttons';
  for(const action of ['start','stop']){const button=document.createElement('button');button.type='button';button.className=action;button.textContent=action==='start'?'Start':'Stop';button.setAttribute('aria-label','Scheduler: '+button.textContent);
   button.onclick=async()=>{revision++;el.dataset.busy='true';buttons.querySelectorAll('button').forEach(b=>b.disabled=true);el.classList.remove('error');put(status,action==='start'?'Starting…':'Stopping…');try{const state=await api('scheduler',{action});delete el.dataset.busy;renderScheduler(state);}catch(e){delete el.dataset.busy;el.classList.add('error');put(status,e.message);buttons.querySelectorAll('button').forEach(b=>b.disabled=false);}};buttons.append(button);}
@@ -83,8 +84,10 @@ function renderScheduler(state){
  const status=el.querySelector('.status'),next=el.querySelector('.next');el.classList.remove('error');put(status,state.running?'Running':'Stopped');status.classList.toggle('running',state.running);
  let detail=state.running?'No schedules enabled':'Manual controls remain available';
  if(state.running&&state.enabled_schedules)detail='No upcoming event in the next week';
- if(state.running&&state.next){const at=dateText(state.next.at,state.timezone);detail='Next: '+state.next.target+' '+state.next.action+' · '+at;}
- put(next,detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
+ const at=next.querySelector('time'),hasNext=!!(state.running&&state.next);
+ at.hidden=!hasNext;
+ if(hasNext){detail='Next: '+state.next.target+' '+(labels[state.next.action]||state.next.action);put(at,dateText(state.next.at,state.timezone));at.dateTime=state.next.at;at.title=(state.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+state.next.at;}
+ put(next.querySelector('.next-event'),detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){
  if(refreshing||!acknowledged||warningOpen)return;refreshing=true;const before=revision;
