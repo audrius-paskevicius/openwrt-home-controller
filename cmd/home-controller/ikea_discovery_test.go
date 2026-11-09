@@ -75,7 +75,7 @@ func TestIKEAHueSaturationAndMode(t *testing.T) {
 		}
 	}
 	m := &ikeaManager{}
-	m.recordMode(target, "temperature")
+	m.recordMode(target, "temperature", ActionValue{Value: intPointer(2700)})
 	items := []IKEATargetInfo{target}
 	m.applyModes(items)
 	if items[0].Mode != "white" {
@@ -91,7 +91,7 @@ func TestIKEAHueSaturationAndMode(t *testing.T) {
 	if items[0].Mode != "" {
 		t.Fatal("external colour change retained misleading white mode")
 	}
-	m.recordMode(target, "saturation")
+	m.recordMode(target, "saturation", ActionValue{Value: intPointer(25)})
 	items = []IKEATargetInfo{target}
 	m.applyModes(items)
 	if items[0].Mode != "color" {

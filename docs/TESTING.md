@@ -375,16 +375,18 @@ fallback, rejecting public/loopback addresses, stable client-key identity across
 changes, and mode invalidation after external colour changes. Hue and saturation
 payload tests ensure each preserves the other setting and brightness.
 
-Chrome tests cover neutral lettered vertical sliders at phone/desktop widths, native
-pointer endpoints, ArrowUp behaviour, commit-only requests, compact white/colour/off
+Chrome tests cover neutral lettered horizontal sliders at phone/desktop widths, native
+pointer endpoints, ArrowRight behaviour, commit-only requests, compact white/colour/off
 status and absence of scrolling overflow. Native LuCI checks cover the Controls-tab
 link, placeholder stars with an empty real input, target selection and hue/saturation
-schedule actions. The original 0.4.0 horizontal/four-row layout was superseded.
+schedule actions. Version 0.4.3 uses single-width tiles with one horizontal slider
+per button-height row.
 
 Physical validation confirmed the new hue and saturation commands preserve each
 other and brightness. The gateway needs paired colour values, so the backend reads
-the current pair before changing one component. Restoration using original xy
-coordinates was verified against the original hue, saturation, brightness, power,
+fresh feedback to detect external changes, then pairs the changed component with
+the saved selection when it is still valid. Restoration tries original XY and H/S
+representations and is verified against the original hue, saturation, brightness, power,
 white temperature and xy reports exactly; this avoids conversion rounding when
 restoring through hue/saturation alone. A separate opt-in restoration test can use
 the retained record with `HC_IKEA_RESTORE_TEST=1` and the selected target ID.
@@ -405,3 +407,10 @@ and status. Existing Chrome checks verify matching top and height, phone/desktop
 geometry, pointer endpoints, keyboard control and commit-only requests. Installed
 assets were checked under production CSP. The backend/radio binaries are byte-identical
 to 0.4.1; configuration and credentials were preserved during installation.
+
+IKEA feedback regressions cover independent W/C/S selections, zero saturation,
+rapid commands before gateway readback, restart persistence, external changes,
+and bounded settling of group feedback. Browser fixtures verify that a released
+slider is not reverted by old feedback and that persistent Mixed states remain
+visible. The opt-in colour-bulb test includes switching between white and colour,
+zero saturation and restoration verified against both H/S and XY readings.

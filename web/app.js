@@ -86,14 +86,14 @@ function card(item,group){
  el.append(title,status,buttons);return el;
 }
 function ikeaCard(item){
- const info=item.ikea||{},caps=info.capabilities||{},wide=!!caps.brightness;
- const el=document.createElement('article');el.className='card ikea'+(wide?' wide':'')+(info.kind==='group'?' group':'');el.dataset.id=item.id;el.dataset.type='ikea';
+ const info=item.ikea||{},caps=info.capabilities||{},hasSliders=!!caps.brightness;
+ const el=document.createElement('article');el.className='card ikea'+(info.kind==='group'?' group':'');el.dataset.id=item.id;el.dataset.type='ikea';
  const body=document.createElement('div');body.className='ikea-body';const main=document.createElement('div');main.className='ikea-main';
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
  const power=document.createElement('div');power.className='buttons';
- const send=async(action,extra={})=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});setTimeout(refresh,700);}catch(e){if(request===el.request){el.dataset.clientError=e.message;put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
+ const send=async(action,extra={})=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});setTimeout(refresh,700);}catch(e){if(request===el.request){el.dataset.clientError=e.message;el.querySelectorAll('input').forEach(x=>{delete x.pending;});put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
  for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}
- main.append(heading(item.name,item.icon,wide?'lamp':'plug'),status,power);body.append(main);
+ main.append(heading(item.name,item.icon,hasSliders?'lamp':'plug'),status,power);body.append(main);
  const sliders=document.createElement('div');sliders.className='ikea-sliders';
  for(const [action,letter,min,max,step,initial] of [['brightness','B',0,100,1,100],['temperature','W',2200,4000,50,2700],['hue','C',0,359,1,0],['saturation','S',0,100,1,100]]){
   if(!(action==='hue'||action==='saturation'?caps.color:caps[action]))continue;
@@ -101,11 +101,13 @@ function ikeaCard(item){
   const rail=document.createElement('span');rail.className='slider-rail';rail.setAttribute('aria-hidden','true');
   const knob=document.createElement('span');knob.className='slider-knob';knob.textContent=letter;rail.append(knob);
   const input=document.createElement('input');input.type='range';input.dataset.action=action;input.min=min;input.max=max;input.step=step;input.value=initial;
-  input.setAttribute('aria-label',item.name+': '+labels[action]);input.setAttribute('aria-orientation','vertical');
-  input.oninput=()=>paintIKEASlider(input);input.onchange=()=>{paintIKEASlider(input);send(action,{value:Number(input.value)});};
+  input.setAttribute('aria-label',item.name+': '+labels[action]);input.setAttribute('aria-orientation','horizontal');
+  input.onpointerdown=input.onkeydown=()=>{input.editing=true;};
+  input.onpointerup=input.onpointercancel=input.onkeyup=input.onblur=()=>{input.editing=false;};
+  input.oninput=()=>paintIKEASlider(input);input.onchange=()=>{paintIKEASlider(input);input.pending={value:Number(input.value),until:Date.now()+8000};send(action,{value:Number(input.value)});};
   slider.append(rail,input);sliders.append(slider);paintIKEASlider(input);
  }
- if(wide)body.append(sliders);el.append(body);renderIKEA(el,item);return el;
+ if(hasSliders)body.append(sliders);el.append(body);renderIKEA(el,item);return el;
 }
 function paintIKEASlider(input,unknown=false){
  const action=input.dataset.action,value=Number(input.value),text=unknown?'Mixed':value+(action==='temperature'?'K':action==='hue'?'°':'%');
@@ -121,13 +123,22 @@ function ikeaStatusText(live){
 function renderIKEA(el,item){
  if(!el)return;const live=item.ikea||{},available=!!live.reachable;
  let text=ikeaStatusText(live);
+ // One bulb can report before another. Confirm a new mixed group state on a
+ // later poll; persistent differences and unavailable members remain visible.
+ if(live.kind==='group'&&live.reachable&&!live.partial&&(live.power==null||live.brightness===-1)&&el.stableStatus){
+  el.mixedSince??=Date.now();if(Date.now()-el.mixedSince<4000)text=el.stableStatus;
+ }else{delete el.mixedSince;el.stableStatus=text;}
  const failure=item.state?.status&&!['Queued','Sent (position unknown)','Superseded','Schedule cancelled'].includes(item.state.status)?item.state.status:'';
  if(el.dataset.clientError||failure)text=el.dataset.clientError||failure;
  put(el.querySelector('.status'),text);el.classList.toggle('error',!!(el.dataset.clientError||failure));
  el.querySelectorAll('button,input').forEach(input=>{input.disabled=!available;});
  for(const action of ['brightness','temperature','hue','saturation']){
-  const input=el.querySelector('[data-action="'+action+'"]');if(!input||el.dataset.busy||document.activeElement===input)continue;
-  const value=live[action],known=available&&value!=null&&value!==-1;
+  const input=el.querySelector('[data-action="'+action+'"]');if(!input||el.dataset.busy||input.editing)continue;
+  const value=live.controls?.[action]??live[action],known=available&&value!=null&&value!==-1;
+  if(input.pending){
+   if(!available||failure||el.dataset.clientError||Date.now()>=input.pending.until||(known&&value===input.pending.value))delete input.pending;
+   else continue;
+  }
   if(known)input.value=String(value);paintIKEASlider(input,!known);
  }
 }

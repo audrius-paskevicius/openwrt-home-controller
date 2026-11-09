@@ -48,6 +48,7 @@ type IKEATarget struct {
 	Capabilities IKEACapabilities `json:"capabilities"`
 }
 type IKEATargetInfo struct {
+	Controls       *ikeaControls `json:"controls,omitempty"`
 	rawHue         int
 	rawSaturation  int
 	Hue            *int   `json:"hue,omitempty"`
@@ -91,6 +92,7 @@ type ikeaSession struct {
 	Key         string `json:"key"`
 }
 type ikeaManager struct {
+	settleUntil                              time.Time
 	network                                  sync.Mutex
 	mu                                       sync.RWMutex
 	status                                   IKEAStatus
@@ -165,6 +167,11 @@ func (m *ikeaManager) connect(c ikeaCredentials, fingerprint, legacyFingerprint 
 func (m *ikeaManager) refresh() {
 	m.network.Lock()
 	defer m.network.Unlock()
+	// PUT acknowledgement precedes Zigbee feedback. Keep the last complete
+	// snapshot while the bulbs transition, including all members of a group.
+	if time.Now().Before(m.settleUntil) {
+		return
+	}
 	var c ikeaCredentials
 	if err := readJSON(m.credentialsPath, &c); err != nil {
 		m.close()
@@ -218,10 +225,19 @@ func (m *ikeaManager) loop() {
 	for {
 		m.refresh()
 		select {
-		case <-time.After(15 * time.Second):
+		case <-time.After(m.refreshDelay()):
 		case <-m.wake:
 		}
 	}
+}
+
+func (m *ikeaManager) refreshDelay() time.Duration {
+	m.network.Lock()
+	defer m.network.Unlock()
+	if delay := time.Until(m.settleUntil); delay > 0 {
+		return delay
+	}
+	return 15 * time.Second
 }
 
 func rawInt(d map[string]json.RawMessage, key string) int {
@@ -485,6 +501,12 @@ func ikeaPayload(t IKEATargetInfo, action string, v ActionValue) (map[string]any
 func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expires time.Time) error {
 	m.network.Lock()
 	defer m.network.Unlock()
+	defer func() {
+		select {
+		case m.wake <- true:
+		default:
+		}
+	}()
 	state := m.snapshot()
 	if !state.Connected || m.conn == nil {
 		return errors.New("IKEA gateway unavailable")
@@ -523,6 +545,10 @@ func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expi
 				if !t.Reachable {
 					return errors.New("IKEA target unavailable")
 				}
+				// A white command also changes reported H/S. Use the last colour
+				// selection, and preserve rapid successive H/S commands even
+				// before the gateway reports the previous one.
+				t = m.colourInput(t)
 			}
 			body, err := ikeaPayload(t, action, v)
 			if err != nil {
@@ -540,7 +566,8 @@ func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expi
 				return fmt.Errorf("IKEA command failed after %d successful sends", sent)
 			} else {
 				sent++
-				m.recordMode(t, action)
+				m.recordMode(t, action, v)
+				m.settleUntil = time.Now().Add(3 * time.Second)
 			}
 		}
 	}

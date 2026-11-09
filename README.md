@@ -36,7 +36,7 @@ and account management stay in LuCI.
 - IKEA Home smart 1 devices and groups as individually named and positioned IKEA tiles.
   Plugs have On/Off; compatible bulbs add brightness, white temperature, and colour,
   including scheduled values. Gateway-reported state is refreshed automatically.
-- Wide light tiles place neutral vertical B/W/C/S sliders beside On/Off, with compact state text.
+- Single-width light tiles place neutral horizontal B/W/C/S sliders below On/Off, with compact state text.
 - Saved IKEA codes are indicated without disclosure; MAC/DHCP hostname tracking follows IP changes.
 - Two-button device/group tiles are shorter; the single built-in Scheduler keeps a three-button tile's height.
 - Steady result messages; group feedback tracks its own commands, independently

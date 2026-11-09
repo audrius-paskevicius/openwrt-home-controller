@@ -311,7 +311,7 @@ by IKEA Home smart 1. Discovery does not add tiles or rearrange them automatical
 Remotes are not selectable control targets.
 
 Plugs have On/Off. Supported lamps expose brightness, white temperature and colour
-using neutral vertical sliders marked B, W, C and S beside On/Off. S controls saturation
+using neutral horizontal sliders marked B, W, C and S below On/Off. S controls saturation
 and allows pastel colours. The scheduler offers the same actions and values. Colour sets hue and
 saturation; use brightness separately for light level. White/colour and positive
 brightness actions turn lamps on. An unavailable gateway or target leaves its tile in
