@@ -26,7 +26,8 @@ driver/helper binaries on another architecture.
    Keep **Follow router** to follow OpenWrt's
    time-zone setting. Ensure the router's date/time and NTP setup are correct.
    Coordinates default to 0,0; they are not inferred from the router's time zone.
-6. Under **General**, enable the service and click **Save & Apply**. This tab shows status and a
+6. Under **General**, enable the service and click **Save & Apply**. This tab shows connected
+   TellSticks, the selected transmitter, Scheduler status and a
    control-page link. Open `https://ROUTER-LAN-ADDRESS:8443/` (or your chosen
    port). Include **https://** explicitly: this service has no HTTP listener or redirect.
    Trust your router's certificate authority on the devices you use to connect.
@@ -44,7 +45,10 @@ LuCI action menu also offers **Apply unchecked**; both apply choices activate th
 package's configuration directly, without UCI's network rollback mechanism.
 Password changes, signing out devices and certificate renewal take effect immediately
 through their own buttons. Their results appear beside those buttons.
-Applying settings or changing the shared login restarts Home Controller. Remembered
+Applying only a changed TellStick preference reconciles the radio without restarting
+the backend or control web server. Other applications of settings, including an
+unchanged **Save & Apply**, restart Home Controller. Changing the shared login,
+signing out all devices and renewing the certificate also request a restart. Remembered
 sessions survive ordinary restarts; password changes and **Sign out all devices**
 invalidate them. The scheduler's saved Running/Stopped preference is retained.
 
@@ -106,9 +110,12 @@ configuration affects LuCI access, not the separate control service. Both still
 need the installed uHTTPd package. Changing or restarting either web instance does
 not change the other instance's configuration.
 
-The **Settings applied** message means the configuration was saved and a restart was requested.
-It does not confirm that every restarted process succeeded. General's Enabled/Disabled
-value reflects saved configuration; diagnostics show the last runtime snapshot.
+The **Settings applied** message means the configuration was saved and either radio
+reconciliation completed or a full service restart was requested. It does not confirm
+the health of restarted processes or successful radio transmission. **Enable service**
+is a configuration checkbox, not a process-health indicator. General's **In use**
+marks the selected connected transmitter; **Advanced → Show details** shows the last
+runtime snapshot.
 If the control page is unavailable, check the selected networks, active addresses,
 firewall, certificate and the system log. Runtime diagnostics may remain from an
 earlier run when the service is stopped or startup fails. Keep a working management
@@ -146,7 +153,8 @@ their original expiry unless revoked.
 Times use a 24-hour clock regardless of browser language. Last-sent times use
 `HH:mm` in the browser's local time zone. Scheduler previews and signed-in-device
 dates use `YYYY-MM-DD HH:mm`; schedule previews keep their configured time zone.
-Exact timestamps remain in hover details and diagnostics. Diagnostic command
+Scheduler/session hover details retain exact timestamps; command details are in
+diagnostics. Diagnostic command
 timestamps use full UTC ISO 8601, including seconds and `Z`.
 
 The status line keeps its previous result while the next command is queued or
@@ -155,7 +163,12 @@ status and reports only its own latest group command, including partial sending
 results. Later individual commands do not change a completed group result. An
 individual command can replace a still-waiting group command for that device;
 the group then reports the resulting partial or cancelled operation. Group results
-are shared across signed-in browsers and reset when the service restarts.
+describe the latest group request, not the current positions or latest individual
+commands. They are shared across signed-in browsers and reset when the service
+restarts. An already open page retains its last result during a queued request;
+a freshly opened page has no previous result to retain. The control page normally
+refreshes every five seconds while visible, with an additional refresh shortly
+after a command is accepted.
 
 Use your phone browser's **Add to Home Screen** command to save a shortcut. The
 control page supplies a Home Controller icon, an Android web manifest and an

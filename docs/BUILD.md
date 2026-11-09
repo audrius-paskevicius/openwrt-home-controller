@@ -17,9 +17,13 @@ apk-tools builds may not provide those applets.
 
 ```
 go test -race ./...
+go vet ./...
 python3 scripts/check-source.py
 node tests/check-js.cjs
 node tests/account-ui.cjs
+sh -n scripts/build-apk.sh
+sh -n files/home-controller.init
+sh -n files/hotplug-usb
 mkdir -p dist
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/home-controller ./cmd/home-controller
 bash scripts/build-radio.sh
@@ -72,12 +76,14 @@ The repository's public key cannot verify packages signed with your private key.
 
 `node tests/browser-ui.cjs` exercises the control page in a disposable headless Chrome
 listening on localhost:9222 (Node 24 or later). It injects synthetic API responses
-and never contacts a router or sends radio commands. It checks mobile layouts,
-control ordering and scheduler interaction. `node tests/account-ui.cjs` checks the
-LuCI form model, password feedback and Save/Apply/Reset handlers with stubbed form
-components. `node tests/warning-ui.cjs` checks acknowledgement and storage behavior
+and never contacts a router or sends radio commands. It checks phone/desktop layouts,
+date formatting, control ordering, scheduler interaction and stable, independent
+group feedback. `node tests/account-ui.cjs` checks the LuCI form model, Access field
+placement, password feedback, Save/Apply/Reset and connected TellStick preferences
+with stubbed form components. `node tests/warning-ui.cjs` checks acknowledgement and storage behavior
 for both interfaces. Native LuCI rendering is checked separately on the target.
 Set `UI_SCREENSHOTS=1` to save control screenshots under ignored `.private/`.
+Set `CHROME_PORT` when the disposable browser uses a port other than 9222.
 The Chrome startup and teardown commands used in CI are in
 [the build workflow](../.github/workflows/build.yml). CI tests and compiles the
 backend and radio artifacts; it does not sign or publish release APKs.

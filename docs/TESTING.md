@@ -4,6 +4,24 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.11 documentation and packaging audit (2026-11-09)
+
+- Checked the current guides against LuCI form/model code, control rendering,
+  command/group tracking, administrator RPC, USB reconciliation, network/TLS
+  setup, defaults, service hooks, package builder and CI workflow.
+- Corrected the README's date-format promise, the removed General status row,
+  full-service versus radio-only Apply behavior, persisted TellStick preference,
+  status refresh/reset semantics and build verification commands. Historical test
+  entries retain the behavior and evidence of their own releases.
+- This release changes documentation and package version only. Backend, radio
+  helper, driver and interface assets are reused unchanged from 0.2.10. The signed
+  APK is built and signature-verified; its extracted payload is checked against
+  source and the previous verified package. Application source, documentation
+  links, canonical disclaimer and all release checksums are checked separately.
+- This packaging audit does not install the new APK or restart the controller.
+  Runtime and physical-radio evidence remains attached to the releases actually
+  tested; no new hardware trial is claimed.
+
 ## 0.2.10 quieter control feedback and Access layout (2026-11-09)
 
 - HTTPS port, allowed networks and certificate renewal are first in Access.

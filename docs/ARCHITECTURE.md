@@ -32,14 +32,18 @@ theme. The disclaimer notice and compact HTTPS-port help have scoped styling
 matching Wi-Fi Coordinator, including light/dark tooltip colours. The short help
 description exposes the full text on hover, keyboard focus or tap; tap again or
 Escape dismisses it. The explanatory text is also exposed to assistive technology.
+The Access tab starts with HTTPS port, allowed networks and certificate renewal,
+followed by the shared account and sessions. Advanced contains transmitter
+preference and diagnostics. Moving settings does not alter access enforcement.
+
 Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
 
 Both interfaces explicitly format Gregorian dates with Latin digits and a 00–23
 hour cycle. Device last-action labels show local `HH:mm`; scheduler and session
 dates use readable ISO ordering, `YYYY-MM-DD HH:mm`. Scheduler previews retain the
-configured schedule time zone; session dates use browser-local time. Full timestamp
-and time-zone details remain available on hover. The compact scheduler tile keeps
+configured schedule time zone; session dates use browser-local time. Scheduler and
+session hover details retain the full timestamp and time zone. The compact scheduler tile keeps
 the date and time together on their own line. Diagnostic command timestamps use
 full UTC ISO 8601 strings, including seconds and `Z`. Raw API/runtime timestamp
 fields retain their existing Unix-seconds or RFC3339 representations.
@@ -63,8 +67,9 @@ means Automatic. The legacy `controller` field remains ignored. USB changes and
 status reads remove missing preferences from active and pending settings without
 discarding other edits. Save/Stage include the selected USB bus/device identity
 as transient RPC metadata, preventing a stale page from restoring a preference
-after unplug/replug. Only the current selection is kept in RAM; there is no
-historical controller inventory. A reboot retains an explicit preference only
+after unplug/replug. The configured preference is stored in the active/draft JSON;
+selected-controller metadata is kept in the runtime directory. There is no historical
+controller inventory. A reboot retains an explicit preference only
 if that stick is present when configuration is reconciled.
 
 Root configuration operations use a file lock to serialize Save/Apply, draft
@@ -116,7 +121,9 @@ A separate nftables input chain drops traffic to the application port arriving o
 other interfaces, before normal router input filtering. Existing firewall rules still
 apply: a VPN zone that rejects router input needs an administrator rule allowing this
 port. This package does not broadly open the VPN zone or change LuCI's listener.
-Network hotplug events refresh the service bindings.
+Network hotplug events request a full service reload to refresh bindings, which
+also resets in-memory command/group results. USB-only handovers use the lighter
+radio reconciliation described above.
 Changing the selected addresses does not renew an existing HTTPS certificate.
 Certificate renewal uses the active configuration and the addresses available then;
 apply network changes before manually renewing when certificate coverage changes.
@@ -136,7 +143,7 @@ service; it requires access to the USB controller and has its own privilege mode
 The queue, last command states and last 100 results are in RAM. Sessions are written
 only when their membership changes. The scheduler's stopped preference is written
 when Start/Stop changes it. No continuous history is written to flash.
-Unknown device position is explicit: a successful send is not a position measurement.
+No physical position feedback is available: a successful send is not a position measurement.
 
 ## Commands and schedules
 
@@ -145,6 +152,15 @@ queued command for the same device. Stop is placed before other queued movement.
 An already executing radio call is bounded by a timeout; Stop cannot interrupt a
 packet already being transmitted. Queued commands expire after 30 seconds instead of replaying stale
 movement. Group operations expand to individual device commands and are serialized.
+
+Control feedback is tracked per submitted target/request. Group result counters
+come from that group request, never an aggregation of arbitrary latest member
+states. Replaced or scheduler-cancelled queued commands settle their original
+request. An older in-flight completion cannot overwrite a newer device or group
+request. Only the latest request per configured target is retained in memory;
+`group_states` exposes sending outcomes without radio addresses. The browser keeps
+existing result text through queue/transmit stages and updates completed results
+only when they change. The status line reserves space even when blank.
 
 The scheduler evaluates events every five seconds. It skips downtime/time jumps over
 90 seconds, deduplicates events, and does not disable schedules after manual control.
@@ -171,16 +187,3 @@ execution. A runtime snapshot is refreshed every five seconds for LuCI status.
 MQTT is not included. The controller queue is the intended integration
 point for a future optional adapter, so that MQTT cannot bypass validation, ordering
 or expiry. No broker or MQTT listener is installed by this package.
-
-Control feedback is tracked per submitted target/request. Group result counters
-come from that group request, never an aggregation of arbitrary latest member
-states. Replaced or scheduler-cancelled queued commands settle their original
-request. An older in-flight completion cannot overwrite a newer device or group
-request. Only the latest request per configured target is retained in memory;
-`group_states` exposes sending outcomes without radio addresses. The browser keeps
-existing result text through queue/transmit stages and updates completed results
-only when they change. The status line reserves space even when blank.
-
-The Access tab starts with HTTPS port, allowed networks and certificate renewal,
-followed by the shared account and sessions. Advanced contains transmitter
-preference and diagnostics. Moving settings does not alter access enforcement.

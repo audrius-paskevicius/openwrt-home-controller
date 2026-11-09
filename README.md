@@ -24,15 +24,20 @@ LuCI. Access is restricted to explicitly selected LAN and VPN networks; WAN is e
 LuCI has **General**, **Controls**, **Schedules**, **Access**, **Advanced**, and the
 full disclaimer tab. Device and schedule editors change a pending form; **Save**
 stores a draft, **Save & Apply** activates it, and **Reset** discards unapplied changes.
+**Access** starts with the control page's HTTPS port, allowed networks and certificate,
+then its shared account and sessions. **Advanced** holds TellStick preference and diagnostics.
 The shared login allows device commands and Scheduler Start/Stop; configuration
 and account management stay in LuCI.
 
-- Individual and group Up, Stop and Down controls; explicit unknown device position.
+- Individual and group Up, Stop and Down controls; no physical position feedback.
+- Steady result messages; group feedback tracks its own commands, independently
+  of later individual-device results.
 - Weekly schedules and optional `sunwait` sunrise, sunset, civil dawn and dusk events.
 - Solar offsets, time bounds, and optional fallback when a solar event does not occur.
 - Manual commands leave future schedules active; missed events are skipped.
 - Scheduler Start/Stop, persistent stopped state, and the next scheduled action.
-- Consistent 24-hour times and ISO 8601 date-times with time-zone offsets.
+- Consistent 24-hour times and readable `YYYY-MM-DD HH:mm` dates; exact timestamps
+  remain in diagnostics and scheduler/session hover details.
 - Native LuCI forms, tabs and sortable tables, with Save, Save & Apply and Reset.
 - A live list of connected TellSticks, capabilities and the transmitter in use.
   Optional **Preferred TellStick** selection returns to Automatic when unplugged.
