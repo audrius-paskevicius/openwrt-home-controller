@@ -265,7 +265,9 @@ quietly. UI updates do not replace the tile or change focused/actively edited co
 Only committed slider selections send commands. Double-width light tiles keep the
 standard On/Off buttons on the left and vertical sliders on the right. Neutral thumbs
 contain B (brightness), W (white temperature), C (hue) and S (saturation), as supported.
-The sliders span the combined 100px height of the two 46px buttons and their 8px gap.
+The sliders span the full tile content height, from the heading to the bottom of Off,
+using the space beside the heading and status. The On/Off buttons remain 46px high
+with their 8px gap.
 There are no rainbow tracks or external labels. Full names and values remain available
 through hover descriptions and accessibility attributes. Plugs stay compact.
 

@@ -136,8 +136,8 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  await page.run('refresh()');assert.equal(await page.run('ikeaMutations'),0);
  for(const width of [320,390,1280]){
   await page.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<650});
-  const geometry=await page.run(`(()=>{const el=document.querySelector('[data-id=ikea]');return {width:el.getBoundingClientRect().width,rows:[...el.querySelectorAll('.ikea-slider')].map(x=>({height:x.getBoundingClientRect().height,top:x.getBoundingClientRect().top,width:x.getBoundingClientRect().width})),power:el.querySelector('.buttons').getBoundingClientRect().height,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
-  assert.equal(geometry.overflow,false);assert(geometry.rows.every(r=>r.height===100&&r.width>=28));assert.equal(geometry.rows[1].top,geometry.rows[0].top);assert.equal(geometry.power,100);
+  const geometry=await page.run(`(()=>{const el=document.querySelector('[data-id=ikea]');return {width:el.getBoundingClientRect().width,rows:[...el.querySelectorAll('.ikea-slider')].map(x=>({height:x.getBoundingClientRect().height,top:x.getBoundingClientRect().top,width:x.getBoundingClientRect().width})),main:el.querySelector('.ikea-main').getBoundingClientRect().height,mainTop:el.querySelector('.ikea-main').getBoundingClientRect().top,power:el.querySelector('.buttons').getBoundingClientRect().height,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+  assert.equal(geometry.overflow,false);assert(geometry.rows.every(r=>Math.abs(r.height-geometry.main)<1&&r.top===geometry.mainTop&&r.height>100&&r.width>=28));assert.equal(geometry.rows[1].top,geometry.rows[0].top);assert.equal(geometry.power,100);
   if(width===390){assert.equal(geometry.width,370);if(process.env.UI_SCREENSHOTS)fs.writeFileSync('.private/ikea-layout-390.png',Buffer.from((await page.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data,'base64'));}
  }
  await page.call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});

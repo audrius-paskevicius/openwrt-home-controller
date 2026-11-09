@@ -397,3 +397,11 @@ gateway identity, and generated client identity/key were preserved during migrat
 only discovery metadata and the private authentication fingerprint were updated.
 No DHCP lease or network settings were modified to force an address change: movement
 and reassignment are covered by synthetic lease/DNS tests against the same resolver.
+
+## Full-height sliders (0.4.2)
+
+The slider columns now stretch alongside the entire left column, including heading
+and status. Existing Chrome checks verify matching top and height, phone/desktop
+geometry, pointer endpoints, keyboard control and commit-only requests. Installed
+assets were checked under production CSP. The backend/radio binaries are byte-identical
+to 0.4.1; configuration and credentials were preserved during installation.
