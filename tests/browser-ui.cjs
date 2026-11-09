@@ -188,6 +188,17 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.match(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),/Mixed/);
  await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.brightness=39;refresh()`);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),stableGroup);
+ // Losing power is current Unavailable state, not an old partial-send error.
+ await page.run(`(()=>{const d=fixture.devices.find(d=>d.id==='ikea');d.state={action:'on',status:'IKEA: 3 sent, 3 unavailable or failed',at:1};d.ikea.reachable=false;d.ikea.partial=false;document.querySelector('[data-id=ikea]').dataset.clientError='Earlier request failed';})();refresh()`);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'Unavailable');
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea]').classList.contains('error')`),false);
+ assert(await page.run(`[...document.querySelectorAll('[data-id=ikea] button,[data-id=ikea] input')].every(x=>x.disabled)`));
+ // Errors remain visible when some group members can still receive commands.
+ await page.run(`delete document.querySelector('[data-id=ikea]').dataset.clientError;fixture.devices.find(d=>d.id==='ikea').ikea.reachable=true;fixture.devices.find(d=>d.id==='ikea').ikea.partial=true;refresh()`);
+ assert.match(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),/3 sent/);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea]').classList.contains('error')`),true);
+ await page.run(`fixture.devices.find(d=>d.id==='ikea').state={};fixture.devices.find(d=>d.id==='ikea').ikea.partial=false;refresh()`);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),stableGroup);
  // Fast polls are temporary and read cached state; they never send commands.
  await page.run('fastRefreshUntil=Date.now()+5000;lastRefreshAt=0;window.pollCount=requests.filter(x=>x.path.endsWith("/state")).length');
  await new Promise(resolve=>setTimeout(resolve,1200));

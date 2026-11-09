@@ -92,7 +92,7 @@ function ikeaCard(item){
  const body=document.createElement('div');body.className='ikea-body';const main=document.createElement('div');main.className='ikea-main';
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
  const power=document.createElement('div');power.className='buttons';
- const send=async(action,extra={})=>{revision++;fastRefreshUntil=Date.now()+10000;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});fastRefreshUntil=Date.now()+10000;setTimeout(refresh,250);}catch(e){if(request===el.request){el.dataset.clientError=e.message;el.querySelectorAll('input').forEach(x=>{delete x.pending;});put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
+ const send=async(action,extra={})=>{revision++;fastRefreshUntil=Date.now()+10000;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});fastRefreshUntil=Date.now()+10000;setTimeout(refresh,250);}catch(e){if(request===el.request){el.dataset.clientError=e.message;el.querySelectorAll('input').forEach(x=>{delete x.pending;});if(el.dataset.available==='true'){put(status,e.message);el.classList.add('error');}}}finally{if(request===el.request)delete el.dataset.busy;}};
  for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}
  main.append(heading(item.name,item.icon,hasSliders?'lamp':'plug'),status,power);body.append(main);
  const sliders=document.createElement('div');sliders.className='ikea-sliders';
@@ -130,7 +130,7 @@ function ikeaStatusText(live){
  if(live.partial)text+=' · Some unavailable';return text;
 }
 function renderIKEA(el,item){
- if(!el)return;const live=item.ikea||{},available=!!live.reachable;
+ if(!el)return;const live=item.ikea||{},available=!!live.reachable;el.dataset.available=String(available);
  let text=ikeaStatusText(live);
  // One bulb can report before another. Confirm a new mixed group state on a
  // later poll; persistent differences and unavailable members remain visible.
@@ -138,8 +138,10 @@ function renderIKEA(el,item){
   el.mixedSince??=Date.now();if(Date.now()-el.mixedSince<4000)text=el.stableStatus;
  }else{delete el.mixedSince;el.stableStatus=text;}
  const failure=item.state?.status&&!['Queued','Sent (position unknown)','Superseded','Schedule cancelled'].includes(item.state.status)?item.state.status:'';
- if(el.dataset.clientError||failure)text=el.dataset.clientError||failure;
- put(el.querySelector('.status'),text);el.classList.toggle('error',!!(el.dataset.clientError||failure));
+ // Current unavailability takes precedence over an earlier command outcome.
+ const error=available?(el.dataset.clientError||failure):'';
+ if(error)text=error;
+ put(el.querySelector('.status'),text);el.classList.toggle('error',!!error);
  el.querySelectorAll('button,input').forEach(input=>{input.disabled=!available;});
  for(const action of ['brightness','temperature']){
   const input=el.querySelector('[data-action="'+action+'"]');if(!input||el.dataset.busy||input.editing)continue;

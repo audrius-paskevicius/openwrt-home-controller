@@ -274,7 +274,10 @@ there is no rollback or replay. Expired queued commands are not sent.
 
 Group state is derived from member reports rather than the gateway's potentially stale
 group attributes. Different member values show Mixed, and partial availability is shown
-quietly. A new Mixed group result is confirmed on a later browser poll (at least four
+quietly. Current unavailability takes precedence over older command errors and
+keeps controls disabled; an unreachable target is not reported as Off. Command
+errors remain visible for reachable targets, including partially reachable groups.
+A new Mixed group result is confirmed on a later browser poll (at least four
 seconds later); persistent differences remain visible. UI updates do not replace
 the tile or change actively edited controls. Released sliders retain a pending
 selection until feedback agrees, an error occurs, or eight seconds elapse; keyboard

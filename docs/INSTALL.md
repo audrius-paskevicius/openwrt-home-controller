@@ -345,3 +345,7 @@ choose a colour dot. Status text uses gateway feedback, not the slider selection
 Changes from IKEA Home smart 1 are detected on later inventory reads; during the
 short post-command settling window the controller cannot distinguish every external
 change from the effects of its own command.
+
+An unreachable IKEA device or fully unreachable group shows Unavailable with
+disabled controls, even when an earlier command had a partial-send error. This is
+not an Off reading: the gateway cannot currently confirm the lamps' state.

@@ -5,7 +5,14 @@ previous hardware trials. Build and test commands are in [BUILD.md](BUILD.md).
 Read the [disclaimer](../DISCLAIMER.txt); passing checks does not establish universal
 hardware compatibility, physical position feedback or measured colour accuracy.
 
-## Current release: 0.4.6
+## 0.4.7 availability feedback
+
+A browser regression checks that an unreachable IKEA group displays neutral
+Unavailable despite older command/client errors, disables all controls, and still
+shows genuine command failures for a reachable or partially reachable target.
+The backend and radio components are unchanged.
+
+## 0.4.6 documentation release
 
 Version 0.4.6 reconciles the documentation with the implemented IKEA integration,
 current tiles, feedback timing, radio-only groups and scheduling. It changes no
