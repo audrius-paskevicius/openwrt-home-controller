@@ -81,16 +81,24 @@ func clearMissingPreferences(dir string, available []map[string]string) error {
 	return nil
 }
 
-func writeRadioConfig(c Config, selected map[string]string) error {
+func radioConfig(c Config, selected map[string]string) string {
 	var radio strings.Builder
 	radio.WriteString("# Managed by Home Controller\nuser = \"homecontroller\"\ngroup = \"homecontroller\"\n")
 	if selected != nil {
 		fmt.Fprintf(&radio, "controller {\n id = 1\n type = 1\n serial = %q\n}\n", selected["serial"])
 	}
 	for _, d := range c.Devices {
+		if d.deviceType() == "switch" {
+			fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"arctech\"\n model = \"codeswitch\"\n controller = 1\n parameters {\n house = %q\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.HouseCode, d.Unit)
+			continue
+		}
 		fmt.Fprintf(&radio, "device {\n id = %d\n name = %q\n protocol = \"hasta\"\n model = \"selflearningv2\"\n controller = 1\n parameters {\n house = %d\n unit = %d\n }\n}\n", d.RadioID, d.ID, d.House, d.Unit)
 	}
-	if err := os.WriteFile("/etc/tellstick.conf", []byte(radio.String()), 0600); err != nil {
+	return radio.String()
+}
+
+func writeRadioConfig(c Config, selected map[string]string) error {
+	if err := os.WriteFile("/etc/tellstick.conf", []byte(radioConfig(c, selected)), 0600); err != nil {
 		return err
 	}
 	adminFile("/etc/tellstick.conf")

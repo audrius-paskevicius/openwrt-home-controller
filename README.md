@@ -14,8 +14,9 @@
 <!-- project-disclaimer:end -->
 
 A local OpenWrt home controller with a separate control page, LuCI administration,
-weekly and solar schedules, and a replaceable Telldus transport. Initial device support
-is Hasta selflearningv2 blinds (Up, Stop, Down). MQTT is reserved for a future optional adapter.
+weekly and solar schedules, and a replaceable Telldus transport. Device support covers
+Hasta selflearningv2 blinds (Up, Stop, Down) and Arctech code-switch receivers (On, Off).
+MQTT is reserved for a future optional adapter.
 
 Users get a small mobile-friendly control page with a shared login and
 remembered sessions. Administrators manage devices, groups, the shared login and schedules in
@@ -29,7 +30,9 @@ then its shared account and sessions. **Advanced** holds TellStick preference an
 The shared login allows device commands and Scheduler Start/Stop; configuration
 and account management stay in LuCI.
 
-- Individual and group Up, Stop and Down controls; no physical position feedback.
+- Switch On/Off and Blind Up/Stop/Down controls, with groups of one device type.
+  No physical position or power-state feedback is available.
+- Dimmer is a disabled placeholder; one built-in Scheduler serves the system.
 - Steady result messages; group feedback tracks its own commands, independently
   of later individual-device results.
 - Weekly schedules and optional `sunwait` sunrise, sunset, civil dawn and dusk events.

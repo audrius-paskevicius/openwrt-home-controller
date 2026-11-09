@@ -37,12 +37,15 @@ var idRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 var errNoSolarEvent = errors.New("solar event does not occur")
 
 type Device struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	RadioID int    `json:"radio_id"`
-	House   int    `json:"house"`
-	Unit    int    `json:"unit"`
-	Icon    string `json:"icon,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	HouseCode string `json:"house_code,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	RadioID   int    `json:"radio_id"`
+	House     int    `json:"house"`
+	Unit      int    `json:"unit"`
+	Icon      string `json:"icon,omitempty"`
 }
 type Group struct {
 	ID      string   `json:"id"`
@@ -207,7 +210,9 @@ func validateSharedAccount(user, password string) error {
 	}
 	return nil
 }
-func validAction(s string) bool { return s == "up" || s == "stop" || s == "down" }
+func validAction(s string) bool {
+	return s == "up" || s == "stop" || s == "down" || s == "on" || s == "off"
+}
 func validTime(s string, optional bool) bool {
 	if s == "" {
 		return optional
@@ -251,8 +256,11 @@ func validate(c Config) error {
 		if !validIcon(d.Icon) {
 			return errors.New("invalid device symbol")
 		}
-		if !idRE.MatchString(d.ID) || ids[d.ID] || len(d.Name) < 1 || len(d.Name) > 80 || d.RadioID < 1 || d.RadioID > 65535 || radios[d.RadioID] || d.House < 1 || d.House > 65535 || d.Unit < 0 || d.Unit > 15 {
+		if !idRE.MatchString(d.ID) || ids[d.ID] || len(d.Name) < 1 || len(d.Name) > 80 || d.RadioID < 1 || d.RadioID > 65535 || radios[d.RadioID] {
 			return errors.New("invalid or duplicate device")
+		}
+		if err := validateDeviceType(d); err != nil {
+			return err
 		}
 		ids[d.ID] = true
 		radios[d.RadioID] = true
@@ -264,7 +272,15 @@ func validate(c Config) error {
 		if !idRE.MatchString(g.ID) || ids[g.ID] || len(g.Name) < 1 || len(g.Name) > 80 || len(g.Devices) == 0 || len(g.Devices) > 64 {
 			return errors.New("invalid group")
 		}
+		if c.targetType(g.ID) == "" {
+			return errors.New("group members must have the same device type")
+		}
+		members := map[string]bool{}
 		for _, id := range g.Devices {
+			if members[id] {
+				return errors.New("group contains a duplicate device")
+			}
+			members[id] = true
 			found := false
 			for _, d := range c.Devices {
 				if d.ID == id {
@@ -279,7 +295,7 @@ func validate(c Config) error {
 	}
 	seen := map[string]bool{}
 	for _, s := range c.Schedules {
-		if !idRE.MatchString(s.ID) || seen[s.ID] || !ids[s.Target] || !validAction(s.Action) || len(s.Days) == 0 || len(s.Days) > 7 || s.Offset < -720 || s.Offset > 720 {
+		if !idRE.MatchString(s.ID) || seen[s.ID] || !ids[s.Target] || !c.supportsAction(s.Target, s.Action) || len(s.Days) == 0 || len(s.Days) > 7 || s.Offset < -720 || s.Offset > 720 {
 			return errors.New("invalid schedule")
 		}
 		seen[s.ID] = true
@@ -466,9 +482,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		devices := []map[string]any{}
 		for _, d := range s.config.Devices {
-			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "state": s.states[d.ID]})
+			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "type": d.deviceType(), "state": s.states[d.ID]})
 		}
-		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "group_states": s.groupStates(), "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon, "control_order": orderedControlKeys(s.config)})
+		groups := []map[string]any{}
+		for _, g := range s.config.Groups {
+			groups = append(groups, map[string]any{"id": g.ID, "name": g.Name, "icon": g.Icon, "devices": g.Devices, "type": s.config.targetType(g.ID)})
+		}
+		answer(w, 200, map[string]any{"devices": devices, "groups": groups, "group_states": s.groupStates(), "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon, "control_order": orderedControlKeys(s.config)})
 	case "/api/scheduler":
 		if r.Method != "POST" {
 			fail(w, 405, "POST required")
@@ -523,6 +543,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Server) enqueue(target, action, source string) error {
+	if !s.config.supportsAction(target, action) {
+		return errors.New("action is not supported by this target")
+	}
 	ids := []string{}
 	for _, d := range s.config.Devices {
 		if d.ID == target {
@@ -564,6 +587,9 @@ func (s *Server) enqueue(target, action, source string) error {
 	return nil
 }
 func (s *Server) send(c Command) error {
+	if !s.config.supportsAction(c.Device, c.Action) {
+		return errors.New("action is not supported by this device")
+	}
 	unlock, err := radioLock()
 	if err != nil {
 		return errors.New("radio is being reconfigured")

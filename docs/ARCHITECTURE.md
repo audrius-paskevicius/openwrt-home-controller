@@ -18,7 +18,8 @@ removing the uHTTPd executable/dependency affects both applications.
 
 The Go controller uses the standard library; no Go modules are downloaded. The Go
 runtime is compiled into the executable. Neither Perl nor Python is needed on the
-router. A small C helper calls the Telldus library's Up, Down and Stop functions.
+router. A small C helper calls the Telldus library's Up, Down, Stop, TurnOn and TurnOff functions,
+after checking the device's supported-method mask.
 The patched Telldus daemon performs USB communication.
 
 The LuCI page calls an administrator-only rpcd plugin. It validates configuration
@@ -146,6 +147,20 @@ when Start/Stop changes it. No continuous history is written to flash.
 No physical position feedback is available: a successful send is not a position measurement.
 
 ## Commands and schedules
+
+Device `type` selects Blind or Switch behavior; a missing type means Blind for
+older configurations. `protocol` is restricted to Hasta for blinds and Arctech
+for switches, with the corresponding fixed driver models `selflearningv2` and
+`codeswitch`. Blinds retain numeric `house`; switches use an A–P `house_code`
+and zero numeric `house`. Unit ranges are validated separately. No arbitrary
+protocol strings or radio-helper operations are accepted.
+
+Groups derive their type from members and require distinct devices of one type.
+Configuration validation checks schedule actions against targets; the command API,
+queue and sender also reject incompatible actions. Public state exposes device/group
+types, not radio addresses or protocol configuration. Dimmer is reserved but rejected
+by validation. Scheduler is one built-in card and one scheduler engine, independent
+of the number of schedule rules.
 
 One queue handles all control and scheduled commands. A newer command replaces a
 queued command for the same device. Stop is placed before other queued movement.

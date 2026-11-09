@@ -89,7 +89,19 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'Down sent to 3/4 · 22:11');
  assert.equal(await page.run('document.querySelector("[data-id=all]").classList.contains("error")'),true);
  await page.run('statusObserver.disconnect()');
+ await page.run('fixture.devices.push({id:"lamp",name:"Test lamp",type:"switch",state:{}});fixture.groups.push({id:"lights",name:"Lights",type:"switch",devices:["lamp"]});fixture.scheduler.next={target:"Lights",action:"off",at:"2026-11-09T21:00:00Z"};fixture.scheduler.enabled_schedules=1;refresh()');
+ assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=lamp] button")].map(b=>b.textContent)'),['On','Off']);
+ assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=lights] button")].map(b=>b.textContent)'),['On','Off']);
+ assert.equal(await page.run('document.querySelector("[data-id=lamp] .status").textContent'),'State unknown');
+ assert.equal(await page.run('document.querySelector("[data-id=lamp] .symbol").dataset.symbol'),'plug');
+ assert.match(await page.run('document.querySelector("#scheduler .next-event").textContent'),/Lights Off/);
+ await page.run('document.querySelector("[data-id=lamp] .on").click()');assert.deepEqual(await page.run('requests.at(-1).body'),{target:'lamp',action:'on'});
+ await page.run('document.querySelector("[data-id=lights] .off").click()');assert.deepEqual(await page.run('requests.at(-1).body'),{target:'lights',action:'off'});
+ assert.equal(await page.run('document.querySelectorAll("#scheduler").length'),1);
+ await page.call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ assert.equal(await page.run('document.documentElement.scrollWidth<=innerWidth'),true);
  console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');
  console.log('PASS: independent group feedback, stable text through requests/queue/polls, accurate partial results');
+ console.log('PASS: switch/group On/Off controls, neutral unknown state, schedule labels and singleton scheduler');
  }finally{await page.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

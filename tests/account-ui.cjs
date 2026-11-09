@@ -9,7 +9,7 @@ class Node {
 }
 const E=(...args)=>new Node(...args);
 class Option {
- constructor(section,name,title){this.map=section.map;this.option=name;this.title=title;this.keylist=[];}
+ constructor(section,name,title){this.section=section;this.map=section.map;this.option=name;this.title=title;this.keylist=[];}
  value(k){this.keylist.push(k);return this;}depends(){}cfgvalue(sid){return this.map.data.get('json',sid,this.option);}
  formvalue(sid){return this.inputValue??this.cfgvalue(sid);}
  getUIElement(){return {setValue:v=>{this.inputValue=v;}};}renderWidget(){return E('button',{},this.inputtitle);}
@@ -89,5 +89,21 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  assert.equal(pref.inputValue,'automatic');assert.deepEqual(pref.keylist,['automatic','TEST_A']);assert.ok(!inventory().includes('TEST_B'));
  currentData={...currentData,controllers:[a,b]};await polls.at(-1)();assert.equal(pref.inputValue,'automatic');assert.deepEqual(pref.keylist,['automatic','TEST_A','TEST_B']);
  currentData={...currentData,controllers:[],active_controller:null};await polls.at(-1)();assert.deepEqual(pref.keylist,['automatic']);assert.match(inventory(),/No TellStick connected/);
+ const typed=JSON.parse(JSON.stringify(config));
+ typed.devices.push({id:'lamp',name:'Test lamp',type:'switch',protocol:'arctech',house_code:'C',house:0,unit:7,radio_id:2});
+ typed.groups.push({id:'lights',name:'Lights',devices:['lamp']});
+ typed.schedules=[{id:'night',enabled:true,target:'lights',action:'off',days:[1],event:'time',time:'22:00',offset:0,earliest:'',latest:'',fallback:''}];
+ await view.renderSettings({...data,config:typed});
+ const rows=view.map.data.sections('json','control'),controlForm=view.map.children.find(s=>s.type==='control');
+ assert.equal(rows.filter(x=>x.kind==='scheduler').length,1);assert.equal(rows.find(x=>x.id==='sample').kind,'blind');assert.equal(rows.find(x=>x.id==='lamp').kind,'switch');
+ assert.notEqual(controlForm.getOption('kind').validate('', 'dimmer'),true);
+ assert.notEqual(controlForm.getOption('devices').validate('', ['sample','lamp']),true);assert.equal(controlForm.getOption('devices').validate('', ['lamp']),true);
+ const lampRow=rows.find(x=>x.id==='lamp')['.name'];assert.equal(controlForm.getOption('unit').validate(lampRow,'16'),true);assert.notEqual(controlForm.getOption('unit').validate(lampRow,'0'),true);
+ const scheduleForm=view.map.children.find(s=>s.type==='scheduling').getOption('_schedules').subsection;
+ scheduleForm.addModalOptions(scheduleForm,'schedule_0');assert.deepEqual(scheduleForm.getOption('action').keylist,['on','off']);
+ scheduleForm.getOption('target').inputValue='sample';scheduleForm.getOption('target').onchange({},'schedule_0','sample');
+ assert.deepEqual(scheduleForm.getOption('action').keylist,['up','stop','down']);assert.equal(scheduleForm.getOption('action').inputValue,'up');
+ respond=()=>Promise.resolve({ok:true});await view.handleSave();saved=JSON.parse(calls.at(-1).args[0]);
+ assert.equal(saved.devices[0].type,'blind');assert.equal(saved.devices[1].type,'switch');assert.equal(saved.devices[1].house_code,'C');assert.equal(saved.devices[1].protocol,'arctech');assert.equal(saved.schedules[0].action,'off');assert.equal(saved.control_order.filter(x=>x==='scheduler').length,1);
  console.log('PASS: native-form handlers, Save/Apply/Reset, credential exclusion, current controller list/capabilities, preference submission, unplug reset and no preference restoration');
 })().catch(e=>{console.error(e);process.exitCode=1;});

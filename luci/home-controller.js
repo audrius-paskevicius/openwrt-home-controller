@@ -16,14 +16,16 @@ const sessions=rpc.declare({object:'home-controller',method:'sessions',expect:{}
 const tls=rpc.declare({object:'home-controller',method:'tls',expect:{}});
 const clone=x=>JSON.parse(JSON.stringify(x));
 const symbols={none:'None',blind:'Blind',clock:'Clock',lamp:'Lamp',plug:'Plug',fan:'Fan'};
-const kinds={device:'Device',group:'Group',scheduler:'Scheduler'};
-const actions={up:'Up',stop:'Stop',down:'Down'};
+const kinds={switch:'Switch',dimmer:'Dimmer (not available yet)',blind:'Blind',group:'Group',scheduler:'Scheduler'};
+const isDevice=d=>d.kind==='blind'||d.kind==='switch';
+const deviceKind=d=>d.type||'blind';
+const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off'};
 const events={time:'Fixed time',sunrise:'Sunrise',sunset:'Sunset',dawn:'Civil dawn',dusk:'Civil dusk'};
 const weekdays={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'};
 function result(r){if(r.error)throw Error(r.error);return r;}
 function feedback(){return E('p',{role:'status','aria-live':'polite',hidden:''});}
 function tell(node,text,error){node.textContent=text;node.hidden=!text;node.classList.toggle('error',!!error);node.classList.toggle('alert-message',!!error);}
-function key(item){return item.kind==='scheduler'?'scheduler':item.kind+':'+item.id;}
+function key(item){return item.kind==='scheduler'?'scheduler':(isDevice(item)?'device':item.kind)+':'+item.id;}
 function list(value){return Array.isArray(value)?value:value?[value]:[];}
 function choice(section,type,name,title,values,description){
  const o=section.option(type,name,title,description);Object.entries(values).forEach(([k,v])=>o.value(k,v));o.rmempty=false;
@@ -63,8 +65,8 @@ function command(section,name,title,caption,handler){
  };return o;
 }
 function model(c){
- const controls=[...c.devices.map(d=>({...d,kind:'device',icon:d.icon||'blind'})),
-  {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||'blind'}))];
+ const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',icon:d.icon||(deviceKind(d)==='switch'?'plug':'blind')})),
+  {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||(c.devices.find(d=>d.id===g.devices[0])?.type==='switch'?'plug':'blind')}))];
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
   schedule:c.schedules.map((s,i)=>({...s,enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
@@ -75,7 +77,7 @@ function configuration(m,original){
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
  c.port=Number(m.data.get('json','access','port'));c.networks=list(m.data.get('json','access','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
  c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
- c.devices=controls.filter(d=>d.kind==='device').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,radio_id:Number(d.radio_id),house:Number(d.house),unit:Number(d.unit)}));
+ c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:d.kind==='switch'?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(d.kind==='switch'?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
  c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,days:list(s.days).map(Number),event:s.event,
@@ -131,18 +133,26 @@ return view.extend({
   const controls=m.section(form.GridSection,'control','Controls','Drag rows to arrange the control page. Devices, groups, and Scheduler can appear in any order.');
   controls.hidetitle=true;controls.anonymous=true;controls.addremove=true;controls.sortable=true;controls.nodescriptions=true;controls.addbtntitle='Add device or group';controls.modaltitle=sid=>kinds[m.data.get('json',sid,'kind')]||'New control';
   let o=value(controls,'name','Name','maxlength(80)');o.validate=(_sid,v)=>v.trim()?true:'Enter a name.';
-  choice(controls,form.ListValue,'kind','Type',kinds);choice(controls,form.ListValue,'icon','Symbol',symbols);
-  o=value(controls,'house','House code','and(uinteger,range(1,65535))','Hasta selflearningv2 radio address.');o.modalonly=true;o.depends('kind','device');
-  o=value(controls,'unit','Unit','and(uinteger,range(0,15))');o.modalonly=true;o.depends('kind','device');
-  o=controls.option(form.MultiValue,'devices','Devices');o.modalonly=true;o.rmempty=false;o.depends('kind','group');
+  const typeOption=choice(controls,form.ListValue,'kind','Type',kinds);
+  typeOption.validate=(_sid,v)=>v==='dimmer'?'Dimmer support is not available yet.':true;
+  typeOption.renderWidget=async function(...args){const node=await form.ListValue.prototype.renderWidget.apply(this,args);const placeholder=node.querySelector('option[value="dimmer"]');if(placeholder)placeholder.disabled=true;return node;};
+  choice(controls,form.ListValue,'icon','Symbol',symbols);
+  o=value(controls,'house','House code','and(uinteger,range(1,65535))','Hasta selflearningv2 radio address.');o.modalonly=true;o.depends('kind','blind');
+  o=choice(controls,form.ListValue,'blind_protocol','Radio protocol',{hasta:'Hasta selflearningv2'});o.modalonly=true;o.depends('kind','blind');o.default='hasta';
+  o=choice(controls,form.ListValue,'switch_protocol','Radio protocol',{arctech:'Arctech code switch'});o.modalonly=true;o.depends('kind','switch');o.default='arctech';
+  o=choice(controls,form.ListValue,'house_code','House code',Object.fromEntries('ABCDEFGHIJKLMNOP'.split('').map(x=>[x,x])));o.modalonly=true;o.depends('kind','switch');o.default='A';
+  o=value(controls,'unit','Unit','and(uinteger,range(0,16))');o.modalonly=true;o.depends('kind','blind');o.depends('kind','switch');
+  o.validate=function(sid,v){const kind=this.section.getOption('kind').formvalue(sid),n=Number(v);return Number.isInteger(n)&&n>=(kind==='switch'?1:0)&&n<=(kind==='switch'?16:15)?true:kind==='switch'?'Use unit 1 to 16.':'Use unit 0 to 15.';};
+  o=controls.option(form.MultiValue,'devices','Devices','Choose devices of one type.');o.modalonly=true;o.rmempty=false;o.depends('kind','group');
+  o.validate=(_sid,v)=>{const ids=list(v),devices=m.data.sections('json','control').filter(d=>ids.includes(d.id));return ids.length&&devices.length===ids.length&&devices.every(isDevice)&&new Set(devices.map(d=>d.kind)).size===1?true:'Choose one or more devices of the same type.';};
   controls.addModalOptions=function(section,sid){
    const d=m.data.get('json',sid),type=section.getOption('kind'),members=section.getOption('devices');type.readonly=m.addedSection!==sid;type.keylist=[];type.vallist=[];
    Object.entries(kinds).filter(([k])=>k!=='scheduler'||d.kind==='scheduler').forEach(([k,v])=>type.value(k,v));section.getOption('name').readonly=d.kind==='scheduler';
-   members.keylist=[];members.vallist=[];m.data.sections('json','control').filter(x=>x.kind==='device').forEach(x=>members.value(x.id,x.name));
+   members.keylist=[];members.vallist=[];m.data.sections('json','control').filter(isDevice).forEach(x=>members.value(x.id,x.name));
   };
   controls.handleAdd=function(){
    const id='control_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','control',id),used=new Set(m.data.sections('json','control').map(x=>Number(x.radio_id)));let radio=1;while(used.has(radio))radio++;
-   Object.entries({id,kind:'device',name:'',icon:'blind',radio_id:radio,unit:1}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);
+   Object.entries({id,kind:'switch',name:'',icon:'plug',radio_id:radio,unit:1,house_code:'A',switch_protocol:'arctech',blind_protocol:'hasta'}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);
   };
   controls.renderRowActions=function(sid){const node=form.GridSection.prototype.renderRowActions.call(this,sid);if(m.data.get('json',sid,'kind')==='scheduler')node.querySelector('.cbi-button-remove')?.remove();return node;};
   controls.handleRemove=function(sid){
@@ -162,11 +172,16 @@ return view.extend({
   for(const [name,title] of [['earliest','Not before'],['latest','Not after'],['fallback','Fallback time']]){
    o=value(grid,name,title,null,name==='fallback'?'Used when the solar event does not occur. Leave empty to skip that day.':null);o.rmempty=true;o.modalonly=true;o.placeholder='HH:MM';o.validate=(_sid,v)=>!v||/^([01]\d|2[0-3]):[0-5]\d$/.test(v)?true:'Use HH:MM (24-hour time).';Object.keys(events).filter(k=>k!=='time').forEach(k=>o.depends('event',k));
   }
-  const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler');
+  const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler'&&x.kind!=='dimmer');
+  const targetKind=id=>{const t=targets().find(x=>x.id===id);return t?.kind==='group'?targets().find(x=>x.id===list(t.devices)[0])?.kind:t?.kind;};
+  const allowedActions=id=>targetKind(id)==='switch'?['on','off']:['up','stop','down'];
+  const updateActions=(section,sid,target)=>{const a=section.getOption('action'),allowed=allowedActions(target),current=a.formvalue(sid),next=allowed.includes(current)?current:allowed[0];a.keylist=[];a.vallist=[];allowed.forEach(k=>a.value(k,actions[k]));const widget=a.getUIElement(sid),select=typeof document==='undefined'?null:document.querySelector('[id="'+a.cbid?.(sid)+'"] select');if(select)select.replaceChildren(...allowed.map(k=>E('option',{value:k},actions[k])));widget?.setValue(next);};
+  grid.getOption('target').onchange=function(_event,sid,v){updateActions(this.section,sid,v);};
+  grid.getOption('action').validate=function(sid,v){return allowedActions(this.section.getOption('target').formvalue(sid)).includes(v)?true:'Choose an action supported by this target.';};
   for(const section of [controls,grid])section.renderMoreOptionsModal=async function(...args){await m.parse();return form.GridSection.prototype.renderMoreOptionsModal.apply(this,args);};
-  grid.addModalOptions=function(section){const t=section.getOption('target');t.keylist=[];t.vallist=[];targets().forEach(d=>t.value(d.id,d.name));};
+  grid.addModalOptions=function(section,sid){const t=section.getOption('target');t.keylist=[];t.vallist=[];targets().forEach(d=>t.value(d.id,d.name));const a=section.getOption('action');a.keylist=[];a.vallist=[];allowedActions(m.data.get('json',sid,'target')).forEach(k=>a.value(k,actions[k]));};
   grid.getOption('target').textvalue=function(sid){return targets().find(x=>x.id===m.data.get('json',sid,'target'))?.name||'Missing device';};
-  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:'up',days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
+  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:allowedActions(targets()[0]?.id)[0],days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
   value(scheduling,'timezone','Time zone',null,'Use “router” to follow the router’s time zone.').value('router','Follow router');
   value(scheduling,'latitude','Latitude','range(-90,90)');value(scheduling,'longitude','Longitude','range(-180,180)');
   dummy(scheduling,'_sunwait','Solar schedules',()=>data.sunwait?'Sunwait is installed':'Install sunwait to use sunrise, sunset, dawn, and dusk.');

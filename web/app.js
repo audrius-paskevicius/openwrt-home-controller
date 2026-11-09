@@ -2,7 +2,7 @@
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
 let disclaimer='',acknowledged=false,warningOpen=false;
 const warningKey='home-controller-disclaimer';
-const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down'};
+const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
 async function api(path,body){
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
@@ -46,7 +46,7 @@ function dateText(value,timeZone,withDate=true){
  if(!withDate)return clock;
  return p.year+'-'+p.month+'-'+p.day+' '+clock;
 }
-function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
+function statusText(state,type){if(!state||!state.status)return type==='switch'?'State unknown':'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
 function groupStatusText(state){
  if(!state?.status)return '';
  const action=labels[state.action]||state.action,time=' · '+dateText(state.at*1000,undefined,false);
@@ -61,7 +61,7 @@ function renderResult(el,state,group){
  if(state?.status==='Queued')return;
  const key=JSON.stringify(state||{});if(el.dataset.result===key)return;
  el.dataset.result=key;
- put(el.querySelector('.status'),group?groupStatusText(state):statusText(state));
+ put(el.querySelector('.status'),group?groupStatusText(state):statusText(state,el.dataset.type));
  el.classList.toggle('error',group?!!state?.failed:!!state?.status&&!['Sent (position unknown)','Schedule cancelled','Superseded'].includes(state.status));
 }
 const symbolPaths={
@@ -76,11 +76,11 @@ function heading(name,symbol,fallback){
  const kind=symbol||fallback;if(symbolPaths[kind]){const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');svg.classList.add('symbol');svg.dataset.symbol=kind;path.setAttribute('d',symbolPaths[kind]);svg.append(path);row.append(svg);}return row;
 }
 function card(item,group){
- const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;
- const title=heading(item.name,item.icon,'blind');
- const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':'Position unknown';
+ const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;el.dataset.type=item.type||'blind';
+ const title=heading(item.name,item.icon,item.type==='switch'?'plug':'blind');
+ const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':item.type==='switch'?'State unknown':'Position unknown';
  const buttons=document.createElement('div');buttons.className='buttons';
- for(const action of ['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);
+ for(const action of item.type==='switch'?['on','off']:['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);
   button.onclick=async()=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';el.setAttribute('aria-busy','true');try{await api('command',{target:item.id,action});if(request===el.request){put($('message'),'');setTimeout(refresh,700);}}catch(e){if(request===el.request){el.classList.add('error');put(status,e.message);}}finally{if(request===el.request){delete el.dataset.busy;el.removeAttribute('aria-busy');}}};buttons.append(button);}
  el.append(title,status,buttons);return el;
 }
@@ -108,7 +108,7 @@ function renderScheduler(state){
 }
 async function refresh(){
  if(refreshing||!acknowledged||warningOpen)return;refreshing=true;const before=revision;
- try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon]),groups,data.scheduler_icon,data.control_order]);
+ try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon,d.type]),groups,data.scheduler_icon,data.control_order]);
   if(key!==signature){const cards=new Map([...data.devices.map(d=>['device:'+d.id,card(d,false)]),['scheduler',schedulerCard(data.scheduler_icon)],...groups.map(g=>['group:'+g.id,card(g,true)])]);const order=[...new Set([...(data.control_order||[]),...cards.keys()])];$('controls').replaceChildren(...order.filter(id=>cards.has(id)).map(id=>cards.get(id)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
   for(const d of data.devices)renderResult([...$('controls').children].find(x=>x.dataset.id===d.id),d.state,false);

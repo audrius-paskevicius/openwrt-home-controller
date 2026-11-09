@@ -12,6 +12,8 @@ int main(int argc,char **argv) {
  if(!strcmp(argv[2],"up")){mask=128;method="tdUp";}
  else if(!strcmp(argv[2],"down")){mask=256;method="tdDown";}
  else if(!strcmp(argv[2],"stop")){mask=512;method="tdStop";}
+ else if(!strcmp(argv[2],"on")){mask=1;method="tdTurnOn";}
+ else if(!strcmp(argv[2],"off")){mask=2;method="tdTurnOff";}
  else return 2;
  alarm(8);
  void *lib=dlopen("libtelldus-core.so.2",RTLD_NOW);

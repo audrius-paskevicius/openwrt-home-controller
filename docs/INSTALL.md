@@ -16,7 +16,7 @@ driver/helper binaries on another architecture.
    password. Any non-empty password up to 256 characters is accepted. Click
    **Set password**; its result appears beside the button. Fresh packages ship with
    the service disabled, no devices or schedules, and no stored login credentials.
-4. Connect a TellStick and add devices and optional groups in **Controls**.
+4. Connect a TellStick and add Switches, Blinds and optional Groups in **Controls**.
    Internal IDs are generated automatically. TellStick selection defaults to
    Automatic; **Advanced → Preferred TellStick** can select a connected stick.
    Under **Access → Allowed networks**, select the LAN and VPN networks that may
@@ -136,11 +136,29 @@ Drag rows in LuCI's **Controls** table to arrange devices, groups and Scheduler
 in any order, then click **Save & Apply**. Existing installations without an explicit
 order retain devices first, then Scheduler, then groups. Newly added controls append
 to the configured order.
-Up/Stop/Down buttons are stacked vertically with a small status line for each control.
+Switches have On/Off buttons; Blinds have Up/Stop/Down. Buttons are stacked vertically
+with a small status line for each control.
 Phones use two columns. Wider screens add columns according to the available width.
 Choose a **Symbol** in any row's editor, including Scheduler: Blind, Clock, Lamp,
 Plug, Fan or None. Existing devices/groups default to Blind, and Scheduler defaults to Clock. Symbols only
 change appearance; choosing Lamp does not change a blind's available commands.
+**Type** determines the actual controls. Existing devices without a type load as
+Blinds, retaining their radio addresses, groups and schedules. New controls default
+to Switch. The supported radio profiles are:
+
+| Type | Radio protocol | House code | Unit |
+| --- | --- | --- | --- |
+| Switch | Arctech code switch | A–P | 1–16 |
+| Blind | Hasta selflearningv2 | 1–65535 | 0–15 |
+
+The Switch profile supports compatible receivers such as the tested Everspring
+BH002; a shared radio frequency alone does not establish protocol compatibility.
+Dimmer is a disabled placeholder, not an implemented brightness or dimming control.
+Groups must contain devices of one type and inherit that type's buttons. Nested
+groups, mixed Switch/Blind groups and duplicate members are rejected.
+There is exactly one built-in Scheduler card. It can be reordered and its symbol
+changed, but it cannot be added again or removed. Existing rows retain their type;
+add a new row to configure a different kind of control.
 The small Sign out link is at the bottom. A remembered login
 lasts for 1–90 days as selected by the administrator (30 by default). Without
 **Remember this device**, the server limits the session to 12 hours and the browser
@@ -187,7 +205,8 @@ Individual schedule
 enable flags stay unchanged; edit them in LuCI.
 
 "Sent" means the Telldus API reported successful transmission. It does not prove
-movement or the current position. Groups send one command per blind, sequentially.
+movement, position or the receiver's actual On/Off state. Groups send one command
+per member device, sequentially.
 Stop takes priority over commands still waiting, but cannot cancel a packet already
 being transmitted. Pending commands expire after 30 seconds; a blocked transmitter
 can therefore cause later commands in a large group to expire. The helper has an
@@ -197,7 +216,9 @@ eight-second alarm and the backend enforces a ten-second process timeout.
 
 In the **Schedules** tab, add or edit a schedule using weekday selection, device/group
 and action dropdowns, and either a fixed **HH:MM** time in 24-hour format or a solar
-event. New schedules default to weekdays, 08:00 and Up, but remain disabled until
+event. The action choices follow the selected target: On/Off for switches and
+switch groups, Up/Stop/Down for blinds and blind groups. New schedules default to
+weekdays, 08:00 and the target's first action (On or Up), but remain disabled until
 explicitly enabled. Solar
 offsets are minutes before/after the event. Earliest/latest bounds clamp the computed
 time. A missing polar solar event is skipped unless a fallback time is configured.

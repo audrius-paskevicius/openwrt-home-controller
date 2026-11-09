@@ -11,7 +11,7 @@ func TestSchedulerStopResumeAndPersistence(t *testing.T) {
 	s := testServer()
 	s.schedulerFile = filepath.Join(t.TempDir(), "scheduler.json")
 	s.config.Timezone = "UTC"
-	s.config.Devices = append(s.config.Devices, Device{"manual", "Manual", 2, 1235, 1, ""})
+	s.config.Devices = append(s.config.Devices, Device{ID: "manual", Name: "Manual", RadioID: 2, House: 1235, Unit: 1})
 	s.config.Schedules = []Schedule{{ID: "morning", Enabled: true, Target: "blind", Action: "up", Days: []int{1}, Event: "time", Time: "08:00"}}
 	at := time.Date(2026, 11, 9, 8, 0, 0, 0, time.UTC)
 	s.enqueue("blind", "up", "schedule")
