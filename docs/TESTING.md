@@ -18,6 +18,9 @@ checked against the current source separately; this does not repeat live radio t
 - Form and native LuCI modal checks confirm Dimmer is selectable, no extra
   Scheduler can be added, and schedule actions follow the selected target.
   Serialization preserves letter addresses and dimmer group membership.
+- Schedule weekday choices and summaries run Monday through Sunday; stored
+  weekday numbers keep their existing meaning. Layout comparisons use normal
+  single-line cards because wrapped error text can increase a card's height.
 - Browser tests cover Toggle/Dim requests and groups, shorter two-button tiles,
   a Scheduler at least as tall as a three-button tile, and no horizontal overflow
   at phone and desktop widths. Existing status, account and disclaimer checks pass.

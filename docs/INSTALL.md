@@ -165,6 +165,7 @@ Two-button device/group tiles use their natural, shorter height. Scheduler retai
 the height of a three-button tile.
 Groups must contain devices of one type and inherit that type's buttons. Nested
 groups, mixed device-type groups and duplicate members are rejected.
+Schedule weekday choices and summaries run Monday through Sunday.
 There is exactly one built-in Scheduler card. It can be reordered and its symbol
 changed, but it cannot be added again or removed. Existing rows retain their type;
 add a new row to configure a different kind of control.

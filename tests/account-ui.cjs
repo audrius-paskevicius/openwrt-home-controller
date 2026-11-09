@@ -103,6 +103,8 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  assert.notEqual(controlForm.getOption('devices').validate('', ['sample','lamp']),true);assert.equal(controlForm.getOption('devices').validate('', ['lamp']),true);
  const lampRow=rows.find(x=>x.id==='lamp')['.name'];assert.equal(controlForm.getOption('unit').validate(lampRow,'16'),true);assert.notEqual(controlForm.getOption('unit').validate(lampRow,'0'),true);
  const scheduleForm=view.map.children.find(s=>s.type==='scheduling').getOption('_schedules').subsection;
+ assert.deepEqual(scheduleForm.getOption('days').keylist,['1','2','3','4','5','6','0']);
+ const dayOption=scheduleForm.getOption('days'),getDays=dayOption.cfgvalue;dayOption.cfgvalue=()=>['0','6','1'];assert.equal(dayOption.textvalue('schedule_0'),'Mon, Sat, Sun');dayOption.cfgvalue=getDays;
  scheduleForm.addModalOptions(scheduleForm,'schedule_0');assert.deepEqual(scheduleForm.getOption('action').keylist,['on','off']);
  assert.ok(scheduleForm.getOption('target').keylist.includes('dimmer'));assert.ok(scheduleForm.getOption('target').keylist.includes('dimmers'));
  scheduleForm.getOption('target').inputValue='dimmers';scheduleForm.getOption('target').onchange({},'schedule_0','dimmers');assert.deepEqual(scheduleForm.getOption('action').keylist,['toggle','dim']);

@@ -100,7 +100,9 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await page.run('document.querySelectorAll("#scheduler").length'),1);
  await page.call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  assert.equal(await page.run('document.documentElement.scrollWidth<=innerWidth'),true);
- await page.run('fixture.devices.push({id:"dimmer",name:"Test dimmer",type:"dimmer",state:{}});fixture.groups.push({id:"dimmers",name:"Dimmers",type:"dimmer",devices:["dimmer"]});fixture.control_order=["device:device0","device:dimmer","device:lamp","scheduler"];refresh()');
+ // Compare normal, single-line cards. Earlier error text can wrap differently
+ // with Linux/Windows fonts and is allowed to increase a card's natural height.
+ await page.run('fixture.devices[0].name="Blind";fixture.devices[0].state={};fixture.devices.push({id:"dimmer",name:"Dimmer",type:"dimmer",state:{}});fixture.groups.push({id:"dimmers",name:"Dimmers",type:"dimmer",devices:["dimmer"]});fixture.control_order=["device:device0","device:dimmer","device:lamp","scheduler"];refresh()');
  assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=dimmer] button")].map(b=>b.textContent)'),['Toggle','Dim']);
  assert.deepEqual(await page.run('[...document.querySelectorAll("[data-id=dimmers] button")].map(b=>b.textContent)'),['Toggle','Dim']);
  assert.equal(await page.run('document.querySelector("[data-id=dimmer] .status").textContent'),'State unknown');

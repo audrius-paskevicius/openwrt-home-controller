@@ -23,15 +23,16 @@ const defaultSymbol=kind=>kind==='dimmer'?'lamp':kind==='switch'?'plug':'blind';
 const deviceKind=d=>d.type||'blind';
 const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim'};
 const events={time:'Fixed time',sunrise:'Sunrise',sunset:'Sunset',dawn:'Civil dawn',dusk:'Civil dusk'};
-const weekdays={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'};
+const weekdays=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['0','Sun']];
 function result(r){if(r.error)throw Error(r.error);return r;}
 function feedback(){return E('p',{role:'status','aria-live':'polite',hidden:''});}
 function tell(node,text,error){node.textContent=text;node.hidden=!text;node.classList.toggle('error',!!error);node.classList.toggle('alert-message',!!error);}
 function key(item){return item.kind==='scheduler'?'scheduler':(isDevice(item)?'device':item.kind)+':'+item.id;}
 function list(value){return Array.isArray(value)?value:value?[value]:[];}
 function choice(section,type,name,title,values,description){
- const o=section.option(type,name,title,description);Object.entries(values).forEach(([k,v])=>o.value(k,v));o.rmempty=false;
- o.textvalue=function(sid){return list(this.cfgvalue(sid)).map(v=>values[v]||v).join(', ');};return o;
+ const entries=Array.isArray(values)?values:Object.entries(values),labels=Object.fromEntries(entries);
+ const o=section.option(type,name,title,description);entries.forEach(([k,v])=>o.value(k,v));o.rmempty=false;
+ o.textvalue=function(sid){const selected=list(this.cfgvalue(sid));return (Array.isArray(values)?entries.map(([k])=>k).filter(k=>selected.includes(k)):selected).map(v=>labels[v]||v).join(', ');};return o;
 }
 function value(section,name,title,datatype,description){const o=section.option(form.Value,name,title,description);o.rmempty=false;if(datatype)o.datatype=datatype;return o;}
 function dummy(section,name,title,render){const o=section.option(form.DummyValue,name,title);o.renderWidget=()=>E('div',{},render());return o;}
