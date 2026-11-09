@@ -4,6 +4,14 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.3.2 receiver profile labels (2026-11-09)
+
+- The Switch editor identifies BH002 / Arctech; the Dimmer editor identifies
+  BH004 / Arctech. Each field is shown only for its matching device type.
+- Form tests cover both labels and unchanged serialization to the Arctech
+  code-switch protocol. Radio commands, schedules and control-page layout are
+  unchanged from 0.3.1.
+
 ## 0.3.1 BH004 dimmer controls and compact tiles (2026-11-09)
 
 - Physical BH004 trials confirmed that the Arctech code-switch Off signal toggles

@@ -99,6 +99,8 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  const rows=view.map.data.sections('json','control'),controlForm=view.map.children.find(s=>s.type==='control');
  assert.equal(rows.filter(x=>x.kind==='scheduler').length,1);assert.equal(rows.find(x=>x.id==='sample').kind,'blind');assert.equal(rows.find(x=>x.id==='lamp').kind,'switch');
  assert.ok(controlForm.getOption('kind').keylist.includes('dimmer'));
+ assert.equal(controlForm.getOption('switch_protocol').textvalue(rows.find(x=>x.id==='lamp')['.name']),'BH002 / Arctech');
+ assert.equal(controlForm.getOption('dimmer_protocol').textvalue(rows.find(x=>x.id==='dimmer')['.name']),'BH004 / Arctech');
  const dimmerRow=rows.find(x=>x.id==='dimmer')['.name'];assert.equal(controlForm.getOption('unit').validate(dimmerRow,'16'),true);assert.notEqual(controlForm.getOption('unit').validate(dimmerRow,'0'),true);
  assert.notEqual(controlForm.getOption('devices').validate('', ['sample','lamp']),true);assert.equal(controlForm.getOption('devices').validate('', ['lamp']),true);
  const lampRow=rows.find(x=>x.id==='lamp')['.name'];assert.equal(controlForm.getOption('unit').validate(lampRow,'16'),true);assert.notEqual(controlForm.getOption('unit').validate(lampRow,'0'),true);

@@ -68,7 +68,7 @@ function command(section,name,title,caption,handler){
  };return o;
 }
 function model(c){
- const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',icon:d.icon||defaultSymbol(deviceKind(d))})),
+ const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',dimmer_protocol:d.protocol||'arctech',icon:d.icon||defaultSymbol(deviceKind(d))})),
   {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||defaultSymbol(c.devices.find(d=>d.id===g.devices[0])?.type)}))];
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
@@ -80,7 +80,7 @@ function configuration(m,original){
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
  c.port=Number(m.data.get('json','access','port'));c.networks=list(m.data.get('json','access','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
  c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
- c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:isCodeSwitch(d)?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(isCodeSwitch(d)?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
+ c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:d.kind==='dimmer'?d.dimmer_protocol||'arctech':d.kind==='switch'?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(isCodeSwitch(d)?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
  c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,days:list(s.days).map(Number),event:s.event,
@@ -141,7 +141,8 @@ return view.extend({
   o=dummy(controls,'_dimmer_help','Dimmer',()=> 'Everspring BH004: Toggle changes power. Dim starts or stops the brightness cycle while on. The same actions can be scheduled. Toggle changes the current power state; Dim requires the lamp to be on. No state or brightness feedback.');o.modalonly=true;o.depends('kind','dimmer');
   o=value(controls,'house','House code','and(uinteger,range(1,65535))','Hasta selflearningv2 radio address.');o.modalonly=true;o.depends('kind','blind');
   o=choice(controls,form.ListValue,'blind_protocol','Radio protocol',{hasta:'Hasta selflearningv2'});o.modalonly=true;o.depends('kind','blind');o.default='hasta';
-  o=choice(controls,form.ListValue,'switch_protocol','Radio protocol',{arctech:'Arctech code switch (BH004 for Dimmer)'});o.modalonly=true;o.depends('kind','switch');o.depends('kind','dimmer');o.default='arctech';
+  o=choice(controls,form.ListValue,'switch_protocol','Radio protocol',{arctech:'BH002 / Arctech'});o.modalonly=true;o.depends('kind','switch');o.default='arctech';
+  o=choice(controls,form.ListValue,'dimmer_protocol','Radio protocol',{arctech:'BH004 / Arctech'});o.modalonly=true;o.depends('kind','dimmer');o.default='arctech';
   o=choice(controls,form.ListValue,'house_code','House code',Object.fromEntries('ABCDEFGHIJKLMNOP'.split('').map(x=>[x,x])));o.modalonly=true;o.depends('kind','switch');o.depends('kind','dimmer');o.default='A';
   o=value(controls,'unit','Unit','and(uinteger,range(0,16))');o.modalonly=true;o.depends('kind','blind');o.depends('kind','switch');o.depends('kind','dimmer');
   o.validate=function(sid,v){const kind=this.section.getOption('kind').formvalue(sid),n=Number(v);return Number.isInteger(n)&&n>=(kind!=='blind'?1:0)&&n<=(kind!=='blind'?16:15)?true:kind!=='blind'?'Use unit 1 to 16.':'Use unit 0 to 15.';};
