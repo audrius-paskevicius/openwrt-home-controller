@@ -48,7 +48,7 @@ func (s *Server) setScheduler(stopped bool, now time.Time) error {
 		pending := s.queue[:0]
 		for _, cmd := range s.queue {
 			if cmd.Source == "schedule" {
-				s.states[cmd.Device] = DeviceState{cmd.Action, "Schedule cancelled", now.Unix()}
+				s.finishCommand(cmd, "Schedule cancelled", now)
 			} else {
 				pending = append(pending, cmd)
 			}
@@ -120,5 +120,5 @@ func (s *Server) schedulerStatus(now time.Time) SchedulerStatus {
 	return out
 }
 func (s *Server) writeStatus(now time.Time) {
-	atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "history": s.history, "queue": len(s.queue), "scheduler": s.schedulerStatus(now)})
+	atomicJSON(run+"/status.json", map[string]any{"devices": s.states, "group_states": s.groupStates(), "history": s.history, "queue": len(s.queue), "scheduler": s.schedulerStatus(now)})
 }

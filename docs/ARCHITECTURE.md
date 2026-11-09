@@ -171,3 +171,16 @@ execution. A runtime snapshot is refreshed every five seconds for LuCI status.
 MQTT is not included. The controller queue is the intended integration
 point for a future optional adapter, so that MQTT cannot bypass validation, ordering
 or expiry. No broker or MQTT listener is installed by this package.
+
+Control feedback is tracked per submitted target/request. Group result counters
+come from that group request, never an aggregation of arbitrary latest member
+states. Replaced or scheduler-cancelled queued commands settle their original
+request. An older in-flight completion cannot overwrite a newer device or group
+request. Only the latest request per configured target is retained in memory;
+`group_states` exposes sending outcomes without radio addresses. The browser keeps
+existing result text through queue/transmit stages and updates completed results
+only when they change. The status line reserves space even when blank.
+
+The Access tab starts with HTTPS port, allowed networks and certificate renewal,
+followed by the shared account and sessions. Advanced contains transmitter
+preference and diagnostics. Moving settings does not alter access enforcement.

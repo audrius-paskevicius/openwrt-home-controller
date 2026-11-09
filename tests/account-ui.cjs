@@ -39,10 +39,13 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  const view=new Function('view','rpc','ui','form','poll','warning','E','L',fs.readFileSync('luci/home-controller.js','utf8'))({extend:x=>x},rpc,{showModal:(_title,body)=>{diagnostic=E('div',{},body);}},form,{add(fn){polls.push(fn);}},{gate:(_t,f)=>f()},E,{resource:x=>x});
  await view.render(data);
  assert.equal(view.map.children.find(s=>s.type==='general').getOption('_scheduler').renderWidget().textContent,'Running · Blind · Up · 2026-11-07 20:00');
- const networks=view.map.children.find(s=>s.type==='advanced').getOption('networks');
+ const networks=view.map.children.find(s=>s.type==='access').getOption('networks');
  assert.equal(networks.title,'Allowed networks');assert.deepEqual(networks.keylist,['lan','wg_test']);
- assert.notEqual(networks.validate('advanced',[]),true);assert.equal(networks.validate('advanced',['lan','wg_test']),true);
+ assert.notEqual(networks.validate('access',[]),true);assert.equal(networks.validate('access',['lan','wg_test']),true);
  const access=view.map.children.find(s=>s.type==='access'),pass=access.getOption('_password'),button=access.getOption('_password_action');
+ assert.deepEqual(access.children.slice(0,3).map(o=>o.option),['port','networks','_tls']);
+ view.map.data.set('json','access','port','9443');await view.handleSaveApply();
+ assert.equal(JSON.parse(calls.at(-1).args[0]).port,9443);calls.length=0;
  const message=button.renderWidget().children[1],event={currentTarget:{disabled:true}}; // LuCI disables before invoking onclick.
  await button.onclick(event);assert.match(message.textContent,/Enter a new password/);assert.equal(calls.length,0);
  pass.inputValue='short';respond=()=>Promise.resolve({error:'Server rejected this request'});
@@ -58,9 +61,9 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  assert.ok(!JSON.stringify(saved).includes('_password'));assert.ok(!JSON.stringify(saved).includes('short'));
  await view.handleSaveApply();assert.equal(calls.at(-1).method,'save');
  // A VPN checkbox must survive Save & Apply, and an explicit deselection must too.
- view.map.data.set('json','advanced','networks',['wg_test']);await view.handleSaveApply();
+ view.map.data.set('json','access','networks',['wg_test']);await view.handleSaveApply();
  assert.deepEqual(JSON.parse(calls.at(-1).args[0]).networks,['wg_test']);
- view.map.data.set('json','advanced','networks',['lan']);await view.handleSaveApply();
+ view.map.data.set('json','access','networks',['lan']);await view.handleSaveApply();
  assert.deepEqual(JSON.parse(calls.at(-1).args[0]).networks,['lan']);
  respond=()=>Promise.resolve({error:'Synthetic save failure'});await view.handleSave();assert.match(view.saveMessage.textContent,/Synthetic save failure/);
  respond=()=>Promise.resolve({ok:true});await view.handleReset();assert.equal(calls.at(-2).method,'discard');assert.equal(view.map.data.get('json','access','session_days'),'30');

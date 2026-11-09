@@ -68,12 +68,12 @@ function model(c){
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
   schedule:c.schedules.map((s,i)=>({...s,enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
-  scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{session_days:c.session_days},advanced:{port:c.port,networks:c.networks,preferred_controller:c.preferred_controller||'automatic'}};
+  scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{port:c.port,networks:c.networks,session_days:c.session_days},advanced:{preferred_controller:c.preferred_controller||'automatic'}};
 }
 function configuration(m,original){
  const c=clone(original),controls=m.data.sections('json','control'),settings=m.data.get('json','scheduling');
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
- c.port=Number(m.data.get('json','advanced','port'));c.networks=list(m.data.get('json','advanced','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
+ c.port=Number(m.data.get('json','access','port'));c.networks=list(m.data.get('json','access','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
  c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
  c.devices=controls.filter(d=>d.kind==='device').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,radio_id:Number(d.radio_id),house:Number(d.house),unit:Number(d.unit)}));
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
@@ -171,6 +171,11 @@ return view.extend({
   value(scheduling,'latitude','Latitude','range(-90,90)');value(scheduling,'longitude','Longitude','range(-180,180)');
   dummy(scheduling,'_sunwait','Solar schedules',()=>data.sunwait?'Sunwait is installed':'Install sunwait to use sunrise, sunset, dawn, and dusk.');
   const access=m.section(form.NamedSection,'access','access','Access');access.hidetitle=true;
+  o=value(access,'port','HTTPS port','and(uinteger,range(1024,65535))','Separate web server for the control page.');
+  o.renderFrame=function(...args){const node=form.Value.prototype.renderFrame.apply(this,args);const description=node.querySelector('.cbi-value-description');if(description)webServerHelp(description);return node;};
+  o=choice(access,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
+  o.validate=(_sid,v)=>list(v).length?true:'Select at least one LAN or VPN network.';
+  command(access,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
   const username=value(access,'_username','Username',null,'Shared login for the control page.');username.cfgvalue=()=>data.account||'home';username.write=username.remove=()=>{};
   const pass=value(access,'_password','New password');pass.password=true;pass.rmempty=true;pass.cfgvalue=()=>'';pass.write=pass.remove=()=>{};
   command(access,'_password_action','Shared login','Set password',async()=>{
@@ -190,11 +195,6 @@ return view.extend({
    'Used for sending. If unplugged, the setting returns to Automatic. Reconnecting the stick does not restore the preference.');
   this.preferredOption=preferred;
   preferred.validate=(_sid,v)=>v==='automatic'||(fresh.controllers||[]).some(usb=>usb.serial===v)?true:'Select Automatic or a connected TellStick.';
-  o=value(advanced,'port','HTTPS port','and(uinteger,range(1024,65535))','Separate web server for the control page.');
-  o.renderFrame=function(...args){const node=form.Value.prototype.renderFrame.apply(this,args);const description=node.querySelector('.cbi-value-description');if(description)webServerHelp(description);return node;};
-  o=choice(advanced,form.MultiValue,'networks','Allowed networks',Object.fromEntries([...new Set(['lan',...(data.networks||[]),...data.config.networks])].filter(n=>n!=='wan'&&n!=='wan6').map(n=>[n,n])),'Allow access only through the selected LAN or VPN networks. Unchecked VPNs are excluded. WAN is unavailable. Existing firewall restrictions still apply.');
-  o.validate=(_sid,v)=>list(v).length?true:'Select at least one LAN or VPN network.';
-  command(advanced,'_tls','HTTPS certificate','Renew certificate',async()=>{result(await tls());return 'Certificate renewed. Home Controller is restarting.';});
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},(k,v)=>k==='at'&&typeof v==='number'?new Date(v*1000).toISOString():v,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');
   disclaimer.render=()=>E('div',{'class':'cbi-section','data-tab':'disclaimer','data-tab-title':disclaimer.title},warning.page(this.disclaimer));

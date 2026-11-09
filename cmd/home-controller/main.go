@@ -98,6 +98,8 @@ type Command struct {
 	Action  string
 	Source  string
 	Expires time.Time
+	Target  string
+	Request uint64
 }
 type DeviceState struct {
 	Action string `json:"action"`
@@ -119,6 +121,9 @@ type Server struct {
 	states           map[string]DeviceState
 	history          []Event
 	queue            []Command
+	requests         map[string]*controlRequest
+	latestDevice     map[string]uint64
+	nextRequest      uint64
 	wake             chan bool
 	attempts         map[string][]time.Time
 	sender           func(Command) error
@@ -463,7 +468,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, d := range s.config.Devices {
 			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "state": s.states[d.ID]})
 		}
-		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon, "control_order": orderedControlKeys(s.config)})
+		answer(w, 200, map[string]any{"devices": devices, "groups": s.config.Groups, "group_states": s.groupStates(), "csrf": session.CSRF, "queue": len(s.queue), "position_feedback": false, "scheduler": s.schedulerStatus(time.Now()), "scheduler_icon": s.config.SchedulerIcon, "control_order": orderedControlKeys(s.config)})
 	case "/api/scheduler":
 		if r.Method != "POST" {
 			fail(w, 405, "POST required")
@@ -532,20 +537,24 @@ func (s *Server) enqueue(target, action, source string) error {
 	if len(ids) == 0 {
 		return errors.New("unknown target")
 	}
+	request := s.beginRequest(target, action, ids)
 	for _, id := range ids {
 		q := []Command{}
 		for _, c := range s.queue {
 			if c.Device != id {
 				q = append(q, c)
+			} else {
+				s.finishCommand(c, "Superseded", time.Now())
 			}
 		}
-		cmd := Command{id, action, source, time.Now().Add(30 * time.Second)}
+		cmd := Command{Device: id, Action: action, Source: source, Expires: time.Now().Add(30 * time.Second), Target: target, Request: request}
 		if action == "stop" {
 			q = append([]Command{cmd}, q...)
 		} else {
 			q = append(q, cmd)
 		}
 		s.queue = q
+		s.latestDevice[id] = request
 		s.states[id] = DeviceState{action, "Queued", time.Now().Unix()}
 	}
 	select {
@@ -603,7 +612,7 @@ func (s *Server) worker() {
 				result = e.Error()
 			}
 			s.mu.Lock()
-			s.states[c.Device] = DeviceState{c.Action, result, time.Now().Unix()}
+			s.finishCommand(c, result, time.Now())
 			s.history = append(s.history, Event{time.Now().Unix(), c.Device, c.Action, c.Source, result})
 			if len(s.history) > 100 {
 				s.history = s.history[len(s.history)-100:]

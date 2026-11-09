@@ -19,7 +19,7 @@ driver/helper binaries on another architecture.
 4. Connect a TellStick and add devices and optional groups in **Controls**.
    Internal IDs are generated automatically. TellStick selection defaults to
    Automatic; **Advanced → Preferred TellStick** can select a connected stick.
-   Under **Advanced → Allowed networks**, select the LAN and VPN networks that may
+   Under **Access → Allowed networks**, select the LAN and VPN networks that may
    access the control page. Fresh installations select LAN only. VPNs must be selected
    explicitly; leaving a VPN unchecked excludes it. WAN cannot be selected.
 5. Under **Schedules**, set coordinates for solar events.
@@ -31,7 +31,7 @@ driver/helper binaries on another architecture.
    port). Include **https://** explicitly: this service has no HTTP listener or redirect.
    Trust your router's certificate authority on the devices you use to connect.
 
-The short help text under **Advanced → HTTPS port** uses the same hover-help style
+The short help text under **Access → HTTPS port** uses the same hover-help style
 as Wi-Fi Coordinator. It explains that Home Controller's uHTTPd instance serves
 the control page separately from LuCI's main web server. Hover, focus with the
 keyboard, or tap to read the details; tap again or press Escape to dismiss them.
@@ -81,7 +81,7 @@ Easy-RSA helper, it requests a separate certificate from that local CA; otherwis
 it creates a self-signed certificate that control devices must explicitly trust.
 This package does not install or configure `router-ca`. If that helper is present
 but issuance fails, renewal reports an error rather than switching to self-signed TLS.
-It never copies LuCI's private key. Use **Advanced → HTTPS certificate → Renew certificate**
+It never copies LuCI's private key. Use **Access → HTTPS certificate → Renew certificate**
 before the certificate expires or after changing the hostname or listener addresses.
 The self-signed fallback lasts one year; certificates issued by `router-ca` use that
 helper's configured validity. Renewal is manual and uses the active configuration,
@@ -100,7 +100,7 @@ Home Controller and LuCI use the same installed uHTTPd program in separate insta
 | Main router web server | `/etc/config/uhttpd`; **Services → uHTTPd** when that LuCI module is installed | LuCI, including Home Controller's administration page |
 | Home Controller web server | **Services → Home Controller**, its own init service | Control login, device buttons and Scheduler Start/Stop; HTTPS 8443 by default |
 
-**Advanced → HTTPS port** and **Allowed networks** affect only the control page.
+**Access → HTTPS port** and **Allowed networks** affect only the control page.
 Its web server starts and stops with Home Controller. Removing the main uHTTPd
 configuration affects LuCI access, not the separate control service. Both still
 need the installed uHTTPd package. Changing or restarting either web instance does
@@ -143,13 +143,19 @@ only through LuCI. Manual commands do not pause or disable later schedules.
 Changing the remembered-session duration affects new logins; existing sessions keep
 their original expiry unless revoked.
 
-Times use a 24-hour clock regardless of browser language. Last-sent times on device
-cards use `HH:mm` in the browser's local time zone. Dates and times elsewhere use
-ISO 8601, for example `2026-11-08T22:10:00+01:00` (`Z` means UTC), with no AM/PM or
-locale-dependent date order. Next scheduled actions use the configured schedule
-time zone in both interfaces. LuCI's signed-in-device dates and numeric command
-timestamps in diagnostics are displayed in the browser's local zone, including
-the UTC offset. These display formats do not change schedule execution times.
+Times use a 24-hour clock regardless of browser language. Last-sent times use
+`HH:mm` in the browser's local time zone. Scheduler previews and signed-in-device
+dates use `YYYY-MM-DD HH:mm`; schedule previews keep their configured time zone.
+Exact timestamps remain in hover details and diagnostics. Diagnostic command
+timestamps use full UTC ISO 8601, including seconds and `Z`.
+
+The status line keeps its previous result while the next command is queued or
+sending, then changes once the result is available. A group starts with a blank
+status and reports only its own latest group command, including partial sending
+results. Later individual commands do not change a completed group result. An
+individual command can replace a still-waiting group command for that device;
+the group then reports the resulting partial or cancelled operation. Group results
+are shared across signed-in browsers and reset when the service restarts.
 
 Use your phone browser's **Add to Home Screen** command to save a shortcut. The
 control page supplies a Home Controller icon, an Android web manifest and an

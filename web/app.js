@@ -47,6 +47,23 @@ function dateText(value,timeZone,withDate=true){
  return p.year+'-'+p.month+'-'+p.day+' '+clock;
 }
 function statusText(state){if(!state||!state.status)return 'Position unknown';if(state.status==='Sent (position unknown)')return labels[state.action]+' sent · '+dateText(state.at*1000,undefined,false);if(state.status==='Queued')return labels[state.action]+' queued';return state.status;}
+function groupStatusText(state){
+ if(!state?.status)return '';
+ const action=labels[state.action]||state.action,time=' · '+dateText(state.at*1000,undefined,false);
+ if(state.sent===state.total)return action+' sent to all'+time;
+ if(state.sent)return action+' sent to '+state.sent+'/'+state.total+time;
+ return action+(state.failed?' failed':' cancelled')+time;
+}
+function renderResult(el,state,group){
+ if(!el||el.dataset.busy)return;
+ // Keep the last result during short queue/transmit stages. Only changed,
+ // completed results touch the live region, including after a request error.
+ if(state?.status==='Queued')return;
+ const key=JSON.stringify(state||{});if(el.dataset.result===key)return;
+ el.dataset.result=key;
+ put(el.querySelector('.status'),group?groupStatusText(state):statusText(state));
+ el.classList.toggle('error',group?!!state?.failed:!!state?.status&&!['Sent (position unknown)','Schedule cancelled','Superseded'].includes(state.status));
+}
 const symbolPaths={
  blind:'M4 3h16v14H4z M4 6h16M4 9h16M4 12h16M4 15h16M20 3v18M18 21h4',
  clock:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 6v6l4 2',
@@ -61,10 +78,10 @@ function heading(name,symbol,fallback){
 function card(item,group){
  const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;
  const title=heading(item.name,item.icon,'blind');
- const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent='Position unknown';
+ const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':'Position unknown';
  const buttons=document.createElement('div');buttons.className='buttons';
  for(const action of ['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);
-  button.onclick=async()=>{revision++;el.classList.remove('error');put(status,'Sending '+labels[action].toLowerCase()+'…');try{await api('command',{target:item.id,action});put(status,labels[action]+' queued');put($('message'),'');setTimeout(refresh,700);}catch(e){el.classList.add('error');put(status,e.message);}};buttons.append(button);}
+  button.onclick=async()=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';el.setAttribute('aria-busy','true');try{await api('command',{target:item.id,action});if(request===el.request){put($('message'),'');setTimeout(refresh,700);}}catch(e){if(request===el.request){el.classList.add('error');put(status,e.message);}}finally{if(request===el.request){delete el.dataset.busy;el.removeAttribute('aria-busy');}}};buttons.append(button);}
  el.append(title,status,buttons);return el;
 }
 function schedulerCard(symbol){
@@ -94,8 +111,8 @@ async function refresh(){
  try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon]),groups,data.scheduler_icon,data.control_order]);
   if(key!==signature){const cards=new Map([...data.devices.map(d=>['device:'+d.id,card(d,false)]),['scheduler',schedulerCard(data.scheduler_icon)],...groups.map(g=>['group:'+g.id,card(g,true)])]);const order=[...new Set([...(data.control_order||[]),...cards.keys()])];$('controls').replaceChildren(...order.filter(id=>cards.has(id)).map(id=>cards.get(id)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
-  for(const d of data.devices){const el=[...$('controls').children].find(x=>x.dataset.id===d.id);if(!el)continue;put(el.querySelector('.status'),statusText(d.state));el.classList.toggle('error',!!d.state.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(d.state.status));}
-  for(const g of groups){const el=[...$('controls').children].find(x=>x.dataset.id===g.id),states=data.devices.filter(d=>g.devices.includes(d.id)).map(d=>d.state);let text='Positions unknown';const failed=states.find(s=>s.status&&!['Queued','Sent (position unknown)','Schedule cancelled'].includes(s.status));if(failed)text='Some commands failed';else if(states.some(s=>s.status==='Queued'))text='Commands queued';else if(states.length&&states.every(s=>s.status==='Sent (position unknown)'&&s.action===states[0].action))text=labels[states[0].action]+' sent to all';else if(states.some(s=>s.status))text='See individual results';put(el.querySelector('.status'),text);el.classList.toggle('error',!!failed);}
+  for(const d of data.devices)renderResult([...$('controls').children].find(x=>x.dataset.id===d.id),d.state,false);
+  for(const g of groups)renderResult([...$('controls').children].find(x=>x.dataset.id===g.id),data.group_states?.[g.id],true);
   renderScheduler(data.scheduler);
  }catch(e){if(!signedIn)showLogin();else{const el=$('scheduler');if(el){put(el.querySelector('.status'),'Connection unavailable');el.querySelectorAll('button').forEach(b=>b.disabled=true);}}if(e.message!=='login required')put($('message'),'Connection interrupted. '+e.message);}
  finally{refreshing=false;}

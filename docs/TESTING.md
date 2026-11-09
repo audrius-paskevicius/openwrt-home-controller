@@ -4,6 +4,26 @@ These entries record checks performed for each release. Older entries describe
 the interface and test suite at that time, not the current UI. Documentation is
 checked against the current source separately; this does not repeat live radio trials.
 
+## 0.2.10 quieter control feedback and Access layout (2026-11-09)
+
+- HTTPS port, allowed networks and certificate renewal are first in Access.
+  Form tests verify their location and preservation of port/network values when
+  saving. The access policy, listeners and certificate implementation are unchanged.
+- Group results track the actual group request. Tests cover unrelated individual
+  successes/failures, partial group results, replaced commands, cancelled schedules
+  and older completions arriving after newer commands.
+- Chrome checks verify stable text through command submission, queue stages and
+  repeated polls, independent group messages, partial-result feedback and layouts
+  from 320 to 1920 pixels. No routing-to-device-results prompt remains.
+- Go tests, Go vet, JavaScript syntax/form tests and disclaimer checks pass.
+  ARM Linux tests run on the router with synthetic radio results; no physical
+  blind commands are sent by this verification.
+- The signed package was installed and all 35 payload files matched their inputs.
+  Native LuCI Access/Advanced contents and phone/desktop layouts were checked.
+  Installed control assets were checked under production CSP with synthetic state
+  and control writes blocked. Configuration, credentials, Scheduler state and
+  network/firewall/LuCI settings retained their hashes. Secret scans passed.
+
 ## 0.2.9 connected TellSticks and automatic fallback (2026-11-09)
 
 - General lists connected models, serials, sending/receiving capabilities and the

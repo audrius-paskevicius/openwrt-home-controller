@@ -73,6 +73,23 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.equal(await page.run('document.querySelector("#scheduler .status").textContent'),'Running');
  await page.run('fixture.control_order=["group:all","scheduler","device:device0"];refresh()');
  assert.deepEqual(await page.run('[...document.querySelectorAll("article h2")].slice(0,3).map(x=>x.textContent)'),['All blinds','Scheduler','Kitchen']);
+ // Group feedback belongs only to group requests. Queue stages and repeated
+ // polls leave existing text alone instead of flashing transient messages.
+ assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'');
+ await page.run('fixture.group_states={all:{action:"up",status:"Complete",at:Date.parse("2026-11-08T21:10:00Z")/1000,total:4,sent:4,failed:0,cancelled:0,pending:0}};refresh()');
+ assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'Up sent to all · 22:10');
+ await page.run('fixture.devices[0].state={action:"down",status:"radio command failed",at:123};refresh()');
+ assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'Up sent to all · 22:10');
+ assert.equal(await page.run('document.querySelector("[data-id=all]").classList.contains("error")'),false);
+ await page.run('window.statusMutations=0;window.statusObserver=new MutationObserver(m=>statusMutations+=m.length);statusObserver.observe(document.querySelector("[data-id=all] .status"),{childList:true,characterData:true,subtree:true});fixture.group_states.all.status="Queued";fixture.group_states.all.pending=4;document.querySelector("[data-id=all] .down").click()');
+ await page.run('refresh()');await page.run('refresh()');
+ assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'Up sent to all · 22:10');
+ assert.equal(await page.run('statusMutations'),0);
+ await page.run('fixture.group_states.all={action:"down",status:"Complete",at:Date.parse("2026-11-08T21:11:00Z")/1000,total:4,sent:3,failed:1,pending:0};refresh()');
+ assert.equal(await page.run('document.querySelector("[data-id=all] .status").textContent'),'Down sent to 3/4 · 22:11');
+ assert.equal(await page.run('document.querySelector("[data-id=all]").classList.contains("error")'),true);
+ await page.run('statusObserver.disconnect()');
  console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');
+ console.log('PASS: independent group feedback, stable text through requests/queue/polls, accurate partial results');
  }finally{await page.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
