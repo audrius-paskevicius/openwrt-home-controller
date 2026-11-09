@@ -35,7 +35,7 @@ description exposes the full text on hover, keyboard focus or tap; tap again or
 Escape dismisses it. The explanatory text is also exposed to assistive technology.
 The Access tab starts with HTTPS port, allowed networks and certificate renewal,
 followed by the shared account and sessions. Advanced contains transmitter
-preference and diagnostics. Moving settings does not alter access enforcement.
+preference, IKEA gateway connection and diagnostics. Moving settings does not alter access enforcement.
 
 Control symbols are fixed SVG paths selected by a validated name,
 never user-supplied SVG or external image URLs.
@@ -133,7 +133,9 @@ apply network changes before manually renewing when certificate coverage changes
 
 The controller and control web server run as `homecontroller`. Their configuration
 directory is root-owned; configuration and credential files are root-owned and group
-readable. Only session/scheduler state storage and the runtime directory are writable by the service.
+readable. Only the state and runtime directories are writable by the service. The state
+directory holds sessions, Scheduler preference, generated IKEA authentication and
+remembered IKEA white/colour selections.
 The pending configuration file is root-only and never loaded by the daemon.
 The separate control HTTPS private key is root-owned and group-readable by the
 dedicated web server. LuCI's key and the router CA's key are never shared with it.
@@ -144,7 +146,8 @@ service; it requires access to the USB controller and has its own privilege mode
 The queue, last command states and last 100 results are in RAM. Sessions are written
 only when their membership changes. The scheduler's stopped preference is written
 when Start/Stop changes it. No continuous history is written to flash.
-No physical position feedback is available: a successful send is not a position measurement.
+TellStick receivers provide no physical position or power feedback: a successful
+send is not a position measurement. IKEA state is reported separately by its gateway.
 
 ## Commands and schedules
 
@@ -155,7 +158,8 @@ for switches/dimmers, with the corresponding fixed driver models `selflearningv2
 and zero numeric `house`. Unit ranges are validated separately. No arbitrary
 protocol strings or radio-helper operations are accepted.
 
-Groups derive their type from members and require distinct devices of one type.
+Local radio Groups derive their type from members and require distinct devices of
+one radio type. IKEA groups are configured as IKEA targets instead.
 Configuration validation checks schedule actions against targets; the command API,
 queue and sender also reject incompatible actions. Public state exposes device/group
 types, not radio addresses or protocol configuration. BH004 Toggle maps to the
@@ -175,7 +179,7 @@ An already executing radio call is bounded by a timeout; Stop cannot interrupt a
 packet already being transmitted. Queued commands expire after 30 seconds instead of replaying stale
 movement. Group operations expand to individual device commands and are serialized.
 
-Control feedback is tracked per submitted target/request. Group result counters
+Control feedback is tracked per submitted target/request. Local radio Group result counters
 come from that group request, never an aggregation of arbitrary latest member
 states. Replaced or scheduler-cancelled queued commands settle their original
 request. An older in-flight completion cannot overwrite a newer device or group
@@ -225,8 +229,8 @@ cloud login, shell interpolation or arbitrary CoAP paths are introduced. Only Lu
 administrator RPC can set or reconnect the gateway. Control commands retain their
 existing login, same-origin and CSRF requirements.
 
-`/etc/home-controller/ikea/credentials.json` stores the address, gateway identity,
-printed security code and any migrated client credentials. It is root-owned, mode 0640,
+`/etc/home-controller/ikea/credentials.json` stores the address, learned MAC/hostname,
+gateway identity, printed security code and any migrated client credentials. It is root-owned, mode 0640,
 in a root:homecontroller 0750 directory: only root and the service account can read it.
 Newly generated client credentials live in the service-owned, mode 0600
 `/etc/home-controller/state/ikea-auth.json`. Neither file enters configuration JSON,
@@ -254,10 +258,15 @@ the connection status shows the resolved IP.
 
 Discovery polls devices and groups every 15 seconds, serialized with writes. After
 a successful command it retains the previous complete snapshot for 750 ms from
-the last member write, then reads feedback every second for eight seconds before
+the last member write, then schedules reads one second apart for eight seconds before
 returning to normal polling. The browser reads the cached state every second for
-ten seconds after a command, then returns to its five-second interval. This avoids
-stacking long settling and polling delays; late gateway reports get prompt retries. Remotes are omitted from controllable targets. Group capabilities are the
+ten seconds after submitting an IKEA command in that browser, then returns to its
+five-second interval. Scheduled commands and other browsers do not trigger this
+browser-local acceleration. Read
+duration is additional to these intervals; inventories and commands share a network
+lock, so this is not a one-second latency guarantee. This avoids
+stacking long settling and polling delays; late gateway reports get prompt retries.
+Remotes are omitted from controllable targets. Group capabilities are the
 union of controllable members; On/Off affects plugs and lamps, while brightness,
 white temperature and colour affect only supporting lamps. Writes are per member,
 so a mixed group never sends light settings to a plug. Partial failures are reported;
@@ -276,7 +285,8 @@ as supported. Colour-capable lights add a row of five dots: red, yellow, green, 
 and purple. Each sends a full-saturation colour command and preserves brightness.
 Buttons, sliders and the colour row are 46px high with 8px gaps: four rows for B/W
 lights, five for B/W/colour lights. Plugs remain two rows; Scheduler keeps its
-three-row height.
+three-row height. Colour dots and slider thumbs are both 28 px across; the dot row
+uses a little of the side padding on screens up to 340 px to keep all five separate.
 There are no rainbow slider tracks or external labels. Full names and values remain available
 through hover descriptions and accessibility attributes. Plugs stay compact.
 
@@ -292,12 +302,13 @@ Mixed groups avoid a single misleading value.
 The same private record retains separate white, hue and saturation selections. White commands
 change the gateway's reported hue/saturation, and colour commands can change its
 reported temperature. Those conversions do not move the white slider.
-The API `controls` values describe the saved selections; measured values remain
+The authenticated API `controls` values describe the saved selections; measured values remain
 separate and drive the status text. A hue or saturation command pairs its new
 value with the other saved colour component, including rapid consecutive writes
 before readback catches up. Zero saturation retains the selected hue for later
-use. External colour changes invalidate the saved selections after the settling
-window, so another controller's changes are not silently overwritten.
+use. After the ten-second signature-settling window, a changed gateway colour
+signature invalidates saved selections. Changes made by another controller during
+that window cannot reliably be distinguished from this controller's own transition.
 
 IKEA actions are On, Off, brightness (0–100%), white temperature (2200–4000 K), and
 colour (#RRGGBB hue/saturation, brightness independent), hue (0–359 degrees), and

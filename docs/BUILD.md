@@ -47,7 +47,7 @@ SIGN_KEY="$(pwd)/../home-controller-signing/private.pem" APK_TOOL=/path/to/apk.s
 ```
 
 The application builder reads [VERSION](../VERSION), requires the backend and radio
-helper in `dist/`, and creates `dist/luci-app-home-controller-VERSION.apk`. It copies
+helper in `dist/`, and creates `dist/luci-app-home-controller-VERSION.apk`. It includes dependency license notices and copies
 the canonical disclaimer into the package and both interfaces, and installs the
 LuCI disclaimer and help stylesheets. The Markdown guides are distributed in the
 repository and application source archive; they are not installed by the APK.
@@ -77,8 +77,8 @@ The repository's public key cannot verify packages signed with your private key.
 `node tests/browser-ui.cjs` exercises the control page in a disposable headless Chrome
 listening on localhost:9222 (Node 24 or later). It injects synthetic API responses
 and never contacts a router or sends radio commands. It checks phone/desktop layouts,
-date formatting, control ordering, scheduler interaction and stable, independent
-group feedback. `node tests/account-ui.cjs` checks the LuCI form model, Access field
+date formatting, control ordering, scheduler interaction, separate radio-group
+feedback, IKEA B/W controls, colour presets and temporary fast readback. `node tests/account-ui.cjs` checks the LuCI form model, Access field
 placement, password feedback, Save/Apply/Reset and connected TellStick preferences
 with stubbed form components. `node tests/warning-ui.cjs` checks acknowledgement and storage behavior
 for both interfaces. Native LuCI rendering is checked separately on the target.

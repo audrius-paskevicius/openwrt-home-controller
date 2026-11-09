@@ -30,13 +30,14 @@ then its shared account and sessions. **Advanced** holds TellStick preference, I
 The shared login allows device commands and Scheduler Start/Stop; configuration
 and account management stay in LuCI.
 
-- Switch On/Off and Blind Up/Stop/Down controls, with groups of one device type.
-  No physical position or power-state feedback is available.
+- TellStick Switch On/Off and Blind Up/Stop/Down controls, with radio groups of one
+  device type. These receivers provide no position or power-state feedback.
 - Everspring BH004 dimmers have Toggle and Dim controls; Dim starts/stops the brightness cycle while on. Both actions can be scheduled, without state or brightness feedback.
 - IKEA Home smart 1 devices and groups as individually named and positioned IKEA tiles.
   Plugs have On/Off; compatible bulbs add brightness, white temperature, and colour,
   including scheduled values. Gateway-reported state is refreshed automatically.
-- Single-width light tiles place neutral horizontal B/W sliders and five colour preset dots below On/Off, with compact state text.
+- Single-width IKEA light tiles have horizontal B/W sliders and, when supported,
+  five full-saturation colour dots below On/Off. Dots match the 28 px slider thumbs.
 - Saved IKEA codes are indicated without disclosure; MAC/DHCP hostname tracking follows IP changes.
 - Two-button device/group tiles are shorter; the single built-in Scheduler keeps a three-button tile's height.
 - Steady result messages; group feedback tracks its own commands, independently

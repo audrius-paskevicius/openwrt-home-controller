@@ -16,7 +16,9 @@ driver/helper binaries on another architecture.
    password. Any non-empty password up to 256 characters is accepted. Click
    **Set password**; its result appears beside the button. Fresh packages ship with
    the service disabled, no devices or schedules, and no stored login credentials.
-4. Connect a TellStick and add Switches, Blinds and optional Groups in **Controls**.
+4. For radio devices, connect a TellStick and add Switches, Blinds, BH004 Dimmers
+   and optional Groups in **Controls**. For IKEA devices, connect the gateway as
+   described in [IKEA Home smart 1](#ikea-home-smart-1), then add IKEA targets.
    Internal IDs are generated automatically. TellStick selection defaults to
    Automatic; **Advanced → Preferred TellStick** can select a connected stick.
    Under **Access → Allowed networks**, select the LAN and VPN networks that may
@@ -43,8 +45,8 @@ a restart. **Save & Apply** saves and activates the form. **Reset** discards bot
 local edits and the saved draft and reloads the active configuration. The native
 LuCI action menu also offers **Apply unchecked**; both apply choices activate this
 package's configuration directly, without UCI's network rollback mechanism.
-Password changes, signing out devices and certificate renewal take effect immediately
-through their own buttons. Their results appear beside those buttons.
+Password changes, signing out devices, certificate renewal and IKEA Connect/Reconnect
+take effect immediately through their own buttons. Their results appear beside those buttons.
 Applying only a changed TellStick preference reconciles the radio without restarting
 the backend or control web server. Other applications of settings, including an
 unchanged **Save & Apply**, restart Home Controller. Changing the shared login,
@@ -163,8 +165,9 @@ On or Off. Dim requires the lamp to be on and starts/stops its brightness cycle.
 a maximum of four queued presses per dimmer; further requests must wait.
 Two-button device/group tiles use their natural, shorter height. Scheduler retains
 the height of a three-button tile.
-Groups must contain devices of one type and inherit that type's buttons. Nested
-groups, mixed device-type groups and duplicate members are rejected.
+Local radio Groups must contain devices of one radio type and inherit its buttons.
+Nested groups, mixed radio types and duplicate members are rejected. IKEA groups
+are selected directly as IKEA targets; their membership stays in IKEA Home smart 1.
 Schedule weekday choices and summaries run Monday through Sunday.
 There is exactly one built-in Scheduler card. It can be reordered and its symbol
 changed, but it cannot be added again or removed. Existing rows retain their type;
@@ -185,8 +188,8 @@ Scheduler/session hover details retain exact timestamps; command details are in
 diagnostics. Diagnostic command
 timestamps use full UTC ISO 8601, including seconds and `Z`.
 
-The status line keeps its previous result while the next command is queued or
-sending, then changes once the result is available. A group starts with a blank
+For TellStick devices and local radio Groups, the status line keeps its previous
+result while the next command is queued or sending, then changes once the result is available. A group starts with a blank
 status and reports only its own latest group command, including partial sending
 results. Later individual commands do not change a completed group result. An
 individual command can replace a still-waiting group command for that device;
@@ -195,8 +198,8 @@ describe the latest group request, not the current positions or latest individua
 commands. They are shared across signed-in browsers and reset when the service
 restarts. An already open page retains its last result during a queued request;
 a freshly opened page has no previous result to retain. The control page normally
-refreshes every five seconds while visible, with an additional refresh shortly
-after a command is accepted.
+refreshes every five seconds while visible. After submitting an IKEA command in
+that browser, it reads cached state every second for ten seconds; gateway feedback is described below.
 
 Use your phone browser's **Add to Home Screen** command to save a shortcut. The
 control page supplies a Home Controller icon, an Android web manifest and an
@@ -227,8 +230,10 @@ eight-second alarm and the backend enforces a ten-second process timeout.
 In the **Schedules** tab, add or edit a schedule using weekday selection, device/group
 and action dropdowns, and either a fixed **HH:MM** time in 24-hour format or a solar
 event. The action choices follow the selected target: On/Off for switches and
-switch groups, Up/Stop/Down for blinds and blind groups. New schedules default to
-weekdays, 08:00 and the target's first action (On or Up), but remain disabled until
+switch groups, Up/Stop/Down for blinds, Toggle/Dim for BH004 dimmers, and
+capability-dependent power, brightness, white temperature and colour settings for
+IKEA targets. New schedules default to weekdays, 08:00 and the target's first
+action (On, Up or Toggle), but remain disabled until
 explicitly enabled. Solar
 offsets are minutes before/after the event. Earliest/latest bounds clamp the computed
 time. A missing polar solar event is skipped unless a fallback time is configured.
@@ -300,7 +305,8 @@ code, then **Connect**. With saved credentials, leave the code blank and use
 **Reconnect** if needed. Connection changes apply immediately and restart the service;
 other form edits still use Save / Save & Apply. No IKEA account password is required.
 The service must be enabled to discover targets. Saved codes show placeholder stars;
-an empty code field means no code is saved. The router learns the gateway MAC and
+no placeholder means no code is saved. The input itself is always empty until
+you type a replacement; Save & Apply does not submit this field. The router learns the gateway MAC and
 hostname from DHCP and follows address changes automatically. A reservation is not
 required when the gateway uses this router’s standard DHCP service.
 
@@ -313,7 +319,9 @@ Remotes are not selectable control targets.
 Plugs have On/Off. Supported lamps expose brightness, white temperature and colour
 using neutral horizontal B (brightness) and W (white temperature) sliders below On/Off. Colour-capable lights add
 one row of red, yellow, green, blue and purple dots at full saturation; choosing a
-dot preserves brightness. The scheduler still supports arbitrary colours, hue and
+dot preserves brightness. Dots are 28 px across, matching the slider thumbs. Every
+button, slider and dot row is 46 px high: B/W lights have four rows and colour
+lights have five. The scheduler still supports arbitrary colours, hue and
 saturation values, including pastels. Colour sets hue and
 saturation; use brightness separately for light level. White/colour and positive
 brightness actions turn lamps on. An unavailable gateway or target leaves its tile in
@@ -322,3 +330,18 @@ place. Credentials stay on the router; protect backups, which include those secr
 The Controls tab also has an **Open controls** link at the bottom, matching General.
 Light status uses a compact line such as `On 90% 2750K`, or `Off`. Kelvin appears only
 in known white mode, and is omitted for colour or unknown mode.
+
+After an IKEA command, the backend waits 750 ms from the last member write before
+reading feedback, then retries at one-second intervals for eight seconds. Normal
+polling resumes afterward (15 seconds between gateway inventories). Network and
+gateway response times are additional; an accepted command is not immediate
+confirmation of the lamp's state. The browser temporarily polls the cached result
+more often without making its own connection to the gateway.
+
+When a previous stable group result exists, a new inconsistent report is held for
+at least four seconds before showing Mixed. Persistent differences and unavailable members remain visible. White and
+colour are alternative modes: the remembered W setting remains in place when you
+choose a colour dot. Status text uses gateway feedback, not the slider selection.
+Changes from IKEA Home smart 1 are detected on later inventory reads; during the
+short post-command settling window the controller cannot distinguish every external
+change from the effects of its own command.
