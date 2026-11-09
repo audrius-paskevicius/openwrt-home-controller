@@ -93,6 +93,7 @@ type ikeaSession struct {
 }
 type ikeaManager struct {
 	settleUntil                              time.Time
+	feedbackUntil                            time.Time
 	network                                  sync.Mutex
 	mu                                       sync.RWMutex
 	status                                   IKEAStatus
@@ -237,7 +238,16 @@ func (m *ikeaManager) refreshDelay() time.Duration {
 	if delay := time.Until(m.settleUntil); delay > 0 {
 		return delay
 	}
+	if time.Now().Before(m.feedbackUntil) {
+		return time.Second
+	}
 	return 15 * time.Second
+}
+
+func (m *ikeaManager) waitForFeedback() {
+	now := time.Now()
+	m.settleUntil = now.Add(750 * time.Millisecond)
+	m.feedbackUntil = now.Add(8 * time.Second)
 }
 
 func rawInt(d map[string]json.RawMessage, key string) int {
@@ -567,7 +577,7 @@ func (m *ikeaManager) send(target IKEATarget, action string, v ActionValue, expi
 			} else {
 				sent++
 				m.recordMode(t, action, v)
-				m.settleUntil = time.Now().Add(3 * time.Second)
+				m.waitForFeedback()
 			}
 		}
 	}

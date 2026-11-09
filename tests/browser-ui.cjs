@@ -121,23 +121,29 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  }
  // IKEA tiles expose horizontal controls and send slider changes only on commit.
  await page.run(`fixture.devices.push({id:'ikea',name:'Colour lamp',type:'ikea',ikea:{kind:'device',reachable:true,power:true,brightness:60,temperature:2700,color:'#ff8800',hue:32,saturation:100,mode:'white',capabilities:{power:true,brightness:true,temperature:true,color:true}},state:{}});fixture.devices.push({id:'ikeaplug',name:'Plug',type:'ikea',ikea:{kind:'device',reachable:true,power:false,capabilities:{power:true}},state:{}});refresh()`);
- assert.equal(await page.run('document.querySelectorAll("[data-id=ikea] .ikea-sliders > *").length'),4);
+ assert.equal(await page.run('document.querySelectorAll("[data-id=ikea] .ikea-sliders > *").length'),2);
  assert.equal(await page.run('document.querySelectorAll("[data-id=ikeaplug] input").length'),0);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'On 60% 2700K');
- assert.deepEqual(await page.run(`[...document.querySelectorAll('[data-id=ikea] .slider-knob')].map(x=>x.textContent)`),['B','W','C','S']);
+ assert.deepEqual(await page.run(`[...document.querySelectorAll('[data-id=ikea] .slider-knob')].map(x=>x.textContent)`),['B','W']);
  const before=await page.run('requests.length');
  await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=brightness]');x.value='42';x.dispatchEvent(new Event('input',{bubbles:true}));})()`);
  assert.equal(await page.run('requests.length'),before);
  await page.run(`document.querySelector('[data-id=ikea] [data-action=brightness]').dispatchEvent(new Event('change',{bubbles:true}))`);
  assert.deepEqual(await page.run('requests.at(-1).body'),{target:'ikea',action:'brightness',value:42});
- await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=hue]');x.value='120';x.dispatchEvent(new Event('change',{bubbles:true}));})()`);
- assert.deepEqual(await page.run('requests.at(-1).body'),{target:'ikea',action:'hue',value:120});
+ assert.equal(await page.run('document.querySelectorAll("[data-id=ikea] .color-dot").length'),5);
+ assert.equal(await page.run('document.querySelectorAll("[data-id=ikea] [data-action=hue],[data-id=ikea] [data-action=saturation]").length'),0);
+ for(const color of ['#ff0000','#ffff00','#00ff00','#0000ff','#8000ff']){
+  await page.run(`document.querySelector('[data-id=ikea] [data-color="${color}"]').click()`);
+  assert.deepEqual(await page.run('requests.at(-1).body'),{target:'ikea',action:'color',color});
+ }
+ assert(await page.run('fastRefreshUntil-Date.now()>8000'));
  await page.run(`window.ikeaMutations=0;window.ikeaObserver=new MutationObserver(m=>ikeaMutations+=m.length);ikeaObserver.observe(document.querySelector('[data-id=ikea] .status'),{childList:true,characterData:true,subtree:true});refresh()`);
  await page.run('refresh()');assert.equal(await page.run('ikeaMutations'),0);
  for(const width of [320,390,1280]){
   await page.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<650});
   const geometry=await page.run(`(()=>{const el=document.querySelector('[data-id=ikea]');return {width:el.getBoundingClientRect().width,rows:[...el.querySelectorAll('.ikea-slider')].map(x=>({height:x.getBoundingClientRect().height,top:x.getBoundingClientRect().top,width:x.getBoundingClientRect().width})),lastButton:el.querySelector('.off').getBoundingClientRect().bottom,peerWidth:document.querySelector('[data-id=ikeaplug]').getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
   assert.equal(geometry.overflow,false);assert(geometry.rows.every(r=>r.height===46&&r.width>=100));assert.equal(geometry.width,geometry.peerWidth);assert.equal(geometry.rows[0].top-geometry.lastButton,8);assert.equal(geometry.rows[1].top-geometry.rows[0].top,54);
+  assert(await page.run(`(()=>{const row=document.querySelector('[data-id=ikea] .ikea-colors'),r=row.getBoundingClientRect(),dots=[...row.children];return r.height===46&&dots.every(x=>{const b=x.getBoundingClientRect();return b.width>=24&&b.height===46&&b.left>=r.left&&b.right<=r.right+1;});})()`));
   assert.equal(await page.run(`document.querySelector('[data-id=ikea] input').getAttribute('aria-orientation')`),'horizontal');
   if(width===390){assert.equal(geometry.width,180);if(process.env.UI_SCREENSHOTS)fs.writeFileSync('.private/ikea-layout-390.png',Buffer.from((await page.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data,'base64'));}
  }
@@ -160,20 +166,19 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.reachable=false;refresh()`);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'Unavailable');
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] input').disabled`),true);
- // Delayed feedback cannot undo a released slider; selections are distinct
- // from white-derived hue/saturation, even when the input has lost focus.
- await page.run(`(()=>{const d=fixture.devices.find(d=>d.id==='ikea');d.ikea.reachable=true;d.ikea.power=true;d.ikea.hue=30;d.ikea.saturation=65;d.ikea.controls={hue:190,saturation:25,temperature:3000};document.activeElement.blur();for(const x of document.querySelectorAll('[data-id=ikea] input')){delete x.pending;x.editing=false;}})();refresh()`);
- assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=hue]').value`),'190');
- assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=saturation]').value`),'25');
- await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=hue]');x.value=280;x.dispatchEvent(new Event('change'));x.blur();})()`);
+ assert(await page.run(`[...document.querySelectorAll('[data-id=ikea] .color-dot')].every(b=>b.disabled)`));
+ // Delayed feedback cannot undo a released W slider. Colour conversion must
+ // not change the remembered white selection.
+ await page.run(`(()=>{const d=fixture.devices.find(d=>d.id==='ikea');d.ikea.reachable=true;d.ikea.power=true;d.ikea.temperature=4000;d.ikea.controls={temperature:3000};document.activeElement.blur();for(const x of document.querySelectorAll('[data-id=ikea] input')){delete x.pending;x.editing=false;}})();refresh()`);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=temperature]').value`),'3000');
+ await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=temperature]');x.value=2800;x.dispatchEvent(new Event('change'));x.blur();})()`);
  await page.run('refresh()');
- assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=hue]').value`),'280');
- await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.controls.hue=280;refresh()`);
- assert.equal(await page.run(`!!document.querySelector('[data-id=ikea] [data-action=hue]').pending`),false);
- // A persistent mismatch must eventually show actual feedback, not success.
- await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=hue]');x.value=120;x.pending={value:120,until:Date.now()-1};})()`);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=temperature]').value`),'2800');
+ await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.controls.temperature=2800;refresh()`);
+ assert.equal(await page.run(`!!document.querySelector('[data-id=ikea] [data-action=temperature]').pending`),false);
+ await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=temperature]');x.value=2200;x.pending={value:2200,until:Date.now()-1};})()`);
  await page.run('refresh()');
- assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=hue]').value`),'280');
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] [data-action=temperature]').value`),'2800');
  // A transitional mixed group report is quiet; persistent differences remain.
  await page.run(`(()=>{const d=fixture.devices.find(d=>d.id==='ikea');d.ikea.kind='group';d.ikea.brightness=39;d.ikea.mode='white';d.ikea.temperature=3000;}) ();refresh()`);
  const stableGroup=await page.run(`document.querySelector('[data-id=ikea] .status').textContent`);
@@ -183,7 +188,14 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
  assert.match(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),/Mixed/);
  await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.brightness=39;refresh()`);
  assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),stableGroup);
- console.log('PASS: independent W/C/S selections, delayed slider feedback, bounded mismatch handling and transient/persistent group differences');
+ // Fast polls are temporary and read cached state; they never send commands.
+ await page.run('fastRefreshUntil=Date.now()+5000;lastRefreshAt=0;window.pollCount=requests.filter(x=>x.path.endsWith("/state")).length');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ assert(await page.run('requests.filter(x=>x.path.endsWith("/state")).length>pollCount'));
+ await page.run('fastRefreshUntil=0;lastRefreshAt=Date.now();window.pollCount=requests.filter(x=>x.path.endsWith("/state")).length');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ assert(await page.run('requests.filter(x=>x.path.endsWith("/state")).length===pollCount'));
+ console.log('PASS: five preset colour requests, temporary fast readback, independent white selection, delayed slider feedback, bounded mismatch handling and transient/persistent group differences');
  console.log('PASS: IKEA horizontal lettered sliders, phone widths, commit-only controls, quiet feedback, unavailable recovery');
  console.log('PASS: dimmer Toggle/Dim requests and groups; shorter two-button tiles; three-button-height Scheduler');
  console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');

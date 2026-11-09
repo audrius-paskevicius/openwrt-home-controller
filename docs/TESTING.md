@@ -414,3 +414,10 @@ and bounded settling of group feedback. Browser fixtures verify that a released
 slider is not reverted by old feedback and that persistent Mixed states remain
 visible. The opt-in colour-bulb test includes switching between white and colour,
 zero saturation and restoration verified against both H/S and XY readings.
+
+Version 0.4.4 replaces the tile hue/saturation sliders with five full-saturation
+colour dots, and labels the remaining sliders B and W. Chrome fixtures verify each
+exact colour request, disabled handling,
+minimum hit areas and row geometry at 320/390/1280px. Timed browser checks verify
+fast cached-state polling after commands and return to idle polling. Backend tests
+cover the 750 ms initial pause, one-second retries and bounded retry duration.

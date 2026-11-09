@@ -253,9 +253,11 @@ and the last address remain available. Address or hostname entry stays in Advanc
 the connection status shows the resolved IP.
 
 Discovery polls devices and groups every 15 seconds, serialized with writes. After
-a successful command it retains the previous complete snapshot for three seconds
-from the last member write, then reads settled feedback. This prevents intermediate
-member reports from flashing Mixed during group transitions. Remotes are omitted from controllable targets. Group capabilities are the
+a successful command it retains the previous complete snapshot for 750 ms from
+the last member write, then reads feedback every second for eight seconds before
+returning to normal polling. The browser reads the cached state every second for
+ten seconds after a command, then returns to its five-second interval. This avoids
+stacking long settling and polling delays; late gateway reports get prompt retries. Remotes are omitted from controllable targets. Group capabilities are the
 union of controllable members; On/Off affects plugs and lamps, while brightness,
 white temperature and colour affect only supporting lamps. Writes are per member,
 so a mixed group never sends light settings to a plug. Partial failures are reported;
@@ -269,25 +271,27 @@ the tile or change actively edited controls. Released sliders retain a pending
 selection until feedback agrees, an error occurs, or eight seconds elapse; keyboard
 focus alone does not indefinitely suppress updates.
 Only committed slider selections send commands. IKEA tiles occupy one grid column,
-with On/Off followed by horizontal sliders. Neutral thumbs contain B (brightness),
-W (white temperature), C (hue) and S (saturation), as supported. Every button and
-slider occupies a 46px row with an 8px gap: four rows for B/W lights, six for
-B/W/C/S lights. Plugs remain two rows, and Scheduler keeps its three-row height.
-There are no rainbow tracks or external labels. Full names and values remain available
+with On/Off followed by horizontal B (brightness) and W (white temperature) sliders,
+as supported. Colour-capable lights add a row of five dots: red, yellow, green, blue
+and purple. Each sends a full-saturation colour command and preserves brightness.
+Buttons, sliders and the colour row are 46px high with 8px gaps: four rows for B/W
+lights, five for B/W/colour lights. Plugs remain two rows; Scheduler keeps its
+three-row height.
+There are no rainbow slider tracks or external labels. Full names and values remain available
 through hover descriptions and accessibility attributes. Plugs stay compact.
 
 The status line shows Off, or On with brightness and a known white temperature, such as
 `On 90% 2750K`. Colour mode omits Kelvin. The gateway does not expose a reliable mode
-flag, so acknowledged W/C/S commands record the mode in the private service-owned
+flag, so acknowledged white/colour commands record the mode in the private service-owned
 `state/ikea-modes.json`. Changing hue/saturation/temperature externally invalidates that
 knowledge when a new colour signature is observed; unknown mode omits Kelvin rather
 than displaying a retained temperature as current. White-only bulbs always use white
 mode. During a short post-command settling window, new reports establish the signature.
 Mixed groups avoid a single misleading value.
 
-The same private record retains separate W, C and S selections. White commands
+The same private record retains separate white, hue and saturation selections. White commands
 change the gateway's reported hue/saturation, and colour commands can change its
-reported temperature. Those conversions do not move the other mode's sliders.
+reported temperature. Those conversions do not move the white slider.
 The API `controls` values describe the saved selections; measured values remain
 separate and drive the status text. A hue or saturation command pairs its new
 value with the other saved colour component, including rapid consecutive writes

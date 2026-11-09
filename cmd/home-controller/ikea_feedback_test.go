@@ -61,17 +61,22 @@ func TestIKEAIndependentSelectionsAndDelayedFeedback(t *testing.T) {
 
 func TestIKEASettlingKeepsCompleteGroupSnapshot(t *testing.T) {
 	previous := IKEAStatus{Connected: true, Targets: []IKEATargetInfo{{IKEATarget: IKEATarget{Kind: "group", ID: 10}, Brightness: intPointer(40)}}}
-	m := &ikeaManager{status: previous, settleUntil: time.Now().Add(3 * time.Second)}
+	m := &ikeaManager{status: previous}
+	m.waitForFeedback()
 	// Without the settle guard refresh would try missing credentials and publish
 	// a disconnected state. No gateway reads may publish a partial transition.
 	m.refresh()
 	if got := m.snapshot(); !got.Connected || len(got.Targets) != 1 || *got.Targets[0].Brightness != 40 {
 		t.Fatal("transition replaced the last complete snapshot")
 	}
-	if delay := m.refreshDelay(); delay <= 0 || delay > 3*time.Second {
+	if delay := m.refreshDelay(); delay <= 0 || delay > 750*time.Millisecond {
 		t.Fatal("did not schedule prompt settled readback", delay)
 	}
 	m.settleUntil = time.Now().Add(-time.Second)
+	if m.refreshDelay() != time.Second {
+		t.Fatal("late Zigbee feedback must be read again promptly")
+	}
+	m.feedbackUntil = time.Now().Add(-time.Second)
 	if m.refreshDelay() != 15*time.Second {
 		t.Fatal("normal polling not restored")
 	}

@@ -1,6 +1,7 @@
 'use strict';
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
 let disclaimer='',acknowledged=false,warningOpen=false;
+let lastRefreshAt=0,fastRefreshUntil=0;
 const warningKey='home-controller-disclaimer';
 const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour',hue:'Colour hue',saturation:'Saturation'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
@@ -91,12 +92,12 @@ function ikeaCard(item){
  const body=document.createElement('div');body.className='ikea-body';const main=document.createElement('div');main.className='ikea-main';
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
  const power=document.createElement('div');power.className='buttons';
- const send=async(action,extra={})=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});setTimeout(refresh,700);}catch(e){if(request===el.request){el.dataset.clientError=e.message;el.querySelectorAll('input').forEach(x=>{delete x.pending;});put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
+ const send=async(action,extra={})=>{revision++;fastRefreshUntil=Date.now()+10000;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});fastRefreshUntil=Date.now()+10000;setTimeout(refresh,250);}catch(e){if(request===el.request){el.dataset.clientError=e.message;el.querySelectorAll('input').forEach(x=>{delete x.pending;});put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
  for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}
  main.append(heading(item.name,item.icon,hasSliders?'lamp':'plug'),status,power);body.append(main);
  const sliders=document.createElement('div');sliders.className='ikea-sliders';
- for(const [action,letter,min,max,step,initial] of [['brightness','B',0,100,1,100],['temperature','W',2200,4000,50,2700],['hue','C',0,359,1,0],['saturation','S',0,100,1,100]]){
-  if(!(action==='hue'||action==='saturation'?caps.color:caps[action]))continue;
+ for(const [action,letter,min,max,step,initial] of [['brightness','B',0,100,1,100],['temperature','W',2200,4000,50,2700]]){
+  if(!caps[action])continue;
   const slider=document.createElement('label');slider.className='ikea-slider';
   const rail=document.createElement('span');rail.className='slider-rail';rail.setAttribute('aria-hidden','true');
   const knob=document.createElement('span');knob.className='slider-knob';knob.textContent=letter;rail.append(knob);
@@ -107,7 +108,15 @@ function ikeaCard(item){
   input.oninput=()=>paintIKEASlider(input);input.onchange=()=>{paintIKEASlider(input);input.pending={value:Number(input.value),until:Date.now()+8000};send(action,{value:Number(input.value)});};
   slider.append(rail,input);sliders.append(slider);paintIKEASlider(input);
  }
- if(hasSliders)body.append(sliders);el.append(body);renderIKEA(el,item);return el;
+ if(hasSliders)body.append(sliders);
+ if(caps.color){
+  const colors=document.createElement('div');colors.className='ikea-colors';colors.setAttribute('role','group');colors.setAttribute('aria-label',item.name+': Colour');
+  for(const [name,color] of [['Red','#ff0000'],['Yellow','#ffff00'],['Green','#00ff00'],['Blue','#0000ff'],['Purple','#8000ff']]){
+   const b=document.createElement('button');b.type='button';b.className='color-dot '+name.toLowerCase();b.dataset.color=color;b.title=name;b.setAttribute('aria-label',item.name+': '+name);b.onclick=()=>send('color',{color});colors.append(b);
+  }
+  body.append(colors);
+ }
+ el.append(body);renderIKEA(el,item);return el;
 }
 function paintIKEASlider(input,unknown=false){
  const action=input.dataset.action,value=Number(input.value),text=unknown?'Mixed':value+(action==='temperature'?'K':action==='hue'?'°':'%');
@@ -132,7 +141,7 @@ function renderIKEA(el,item){
  if(el.dataset.clientError||failure)text=el.dataset.clientError||failure;
  put(el.querySelector('.status'),text);el.classList.toggle('error',!!(el.dataset.clientError||failure));
  el.querySelectorAll('button,input').forEach(input=>{input.disabled=!available;});
- for(const action of ['brightness','temperature','hue','saturation']){
+ for(const action of ['brightness','temperature']){
   const input=el.querySelector('[data-action="'+action+'"]');if(!input||el.dataset.busy||input.editing)continue;
   const value=live.controls?.[action]??live[action],known=available&&value!=null&&value!==-1;
   if(input.pending){
@@ -165,7 +174,7 @@ function renderScheduler(state){
  put(next.querySelector('.next-event'),detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){
- if(refreshing||!acknowledged||warningOpen)return;refreshing=true;const before=revision;
+ if(refreshing||!acknowledged||warningOpen)return;refreshing=true;lastRefreshAt=Date.now();const before=revision;
  try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon,d.type,d.ikea?.capabilities]),groups,data.scheduler_icon,data.control_order]);
   if(key!==signature){const cards=new Map([...data.devices.map(d=>['device:'+d.id,card(d,false)]),['scheduler',schedulerCard(data.scheduler_icon)],...groups.map(g=>['group:'+g.id,card(g,true)])]);const order=[...new Set([...(data.control_order||[]),...cards.keys()])];$('controls').replaceChildren(...order.filter(id=>cards.has(id)).map(id=>cards.get(id)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
@@ -178,4 +187,4 @@ async function refresh(){
 $('login').onsubmit=async event=>{event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;put($('login-message'),'Signing in…');try{const data=await api('login',{user:$('username').value,password:$('password').value,remember:$('remember').checked});csrf=data.csrf;$('password').value='';put($('login-message'),'');await refresh();}catch(e){put($('login-message'),e.message);}finally{button.disabled=false;}};
 $('logout').onclick=async()=>{try{await api('logout',{});showLogin();put($('message'),'');}catch(e){put($('message'),e.message);}};
 $('warning-link').onclick=event=>{if(disclaimer){event.preventDefault();showWarning();}};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});setInterval(()=>{if(signedIn&&!document.hidden)refresh();},5000);initialize();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});setInterval(()=>{if(signedIn&&!document.hidden&&Date.now()-lastRefreshAt>=(Date.now()<fastRefreshUntil?900:4900))refresh();},1000);initialize();
