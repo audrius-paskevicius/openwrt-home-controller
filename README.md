@@ -14,7 +14,7 @@
 <!-- project-disclaimer:end -->
 
 A local OpenWrt home controller with a separate control page, LuCI administration,
-weekly and solar schedules, and a replaceable Telldus transport. Device support covers
+weekly and solar schedules, Telldus radio control and local IKEA TRÅDFRI gateway integration. Device support covers
 Hasta selflearningv2 blinds (Up, Stop, Down) and Arctech code-switch receivers (On, Off).
 MQTT is reserved for a future optional adapter.
 
@@ -26,13 +26,17 @@ LuCI has **General**, **Controls**, **Schedules**, **Access**, **Advanced**, and
 full disclaimer tab. Device and schedule editors change a pending form; **Save**
 stores a draft, **Save & Apply** activates it, and **Reset** discards unapplied changes.
 **Access** starts with the control page's HTTPS port, allowed networks and certificate,
-then its shared account and sessions. **Advanced** holds TellStick preference and diagnostics.
+then its shared account and sessions. **Advanced** holds TellStick preference, IKEA gateway connection, and diagnostics.
 The shared login allows device commands and Scheduler Start/Stop; configuration
 and account management stay in LuCI.
 
 - Switch On/Off and Blind Up/Stop/Down controls, with groups of one device type.
   No physical position or power-state feedback is available.
 - Everspring BH004 dimmers have Toggle and Dim controls; Dim starts/stops the brightness cycle while on. Both actions can be scheduled, without state or brightness feedback.
+- IKEA Home smart 1 devices and groups as individually named and positioned IKEA tiles.
+  Plugs have On/Off; compatible bulbs add brightness, white temperature, and colour,
+  including scheduled values. Gateway-reported state is refreshed automatically.
+- Wide light tiles use fixed, evenly spaced rows; no expanding control sections.
 - Two-button device/group tiles are shorter; the single built-in Scheduler keeps a three-button tile's height.
 - Steady result messages; group feedback tracks its own commands, independently
   of later individual-device results.

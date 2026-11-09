@@ -119,6 +119,29 @@ const fixture={csrf:'synthetic-token',devices:['Kitchen','Kids room','Bedroom','
   assert.ok(heights.scheduler>=heights.device0-1,JSON.stringify(heights));
   assert.equal(await page.run('document.documentElement.scrollWidth<=innerWidth'),true);
  }
+ // IKEA tiles expose fixed rows and send slider changes only on commit.
+ await page.run(`fixture.devices.push({id:'ikea',name:'Colour lamp',type:'ikea',ikea:{kind:'device',reachable:true,power:true,brightness:60,temperature:2700,color:'#ff8800',capabilities:{power:true,brightness:true,temperature:true,color:true}},state:{}});fixture.devices.push({id:'ikeaplug',name:'Plug',type:'ikea',ikea:{kind:'device',reachable:true,power:false,capabilities:{power:true}},state:{}});refresh()`);
+ assert.equal(await page.run('document.querySelectorAll("[data-id=ikea] .ikea-controls > *").length'),4);
+ assert.equal(await page.run('document.querySelectorAll("[data-id=ikeaplug] input").length'),0);
+ const before=await page.run('requests.length');
+ await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=brightness]');x.value='42';x.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ assert.equal(await page.run('requests.length'),before);
+ await page.run(`document.querySelector('[data-id=ikea] [data-action=brightness]').dispatchEvent(new Event('change',{bubbles:true}))`);
+ assert.deepEqual(await page.run('requests.at(-1).body'),{target:'ikea',action:'brightness',value:42});
+ await page.run(`(()=>{const x=document.querySelector('[data-id=ikea] [data-action=color]');x.value='#00ff00';x.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ assert.deepEqual(await page.run('requests.at(-1).body'),{target:'ikea',action:'color',color:'#00ff00'});
+ await page.run(`window.ikeaMutations=0;window.ikeaObserver=new MutationObserver(m=>ikeaMutations+=m.length);ikeaObserver.observe(document.querySelector('[data-id=ikea] .status'),{childList:true,characterData:true,subtree:true});refresh()`);
+ await page.run('refresh()');assert.equal(await page.run('ikeaMutations'),0);
+ for(const width of [320,390,1280]){
+  await page.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<650});
+  const geometry=await page.run(`(()=>{const el=document.querySelector('[data-id=ikea]');return {width:el.getBoundingClientRect().width,rows:[...el.querySelector('.ikea-controls').children].map(x=>({height:x.getBoundingClientRect().height,top:x.getBoundingClientRect().top})),overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+  assert.equal(geometry.overflow,false);assert(geometry.rows.every(r=>r.height===46));assert.equal(geometry.rows[1].top-geometry.rows[0].top,54);
+  if(width===390){assert.equal(geometry.width,370);if(process.env.UI_SCREENSHOTS)fs.writeFileSync('.private/ikea-layout-390.png',Buffer.from((await page.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data,'base64'));}
+ }
+ await page.run(`fixture.devices.find(d=>d.id==='ikea').ikea.reachable=false;refresh()`);
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] .status').textContent`),'Unavailable');
+ assert.equal(await page.run(`document.querySelector('[data-id=ikea] input').disabled`),true);
+ console.log('PASS: IKEA fixed four-row tiles, phone widths, commit-only controls, quiet feedback, unavailable recovery');
  console.log('PASS: dimmer Toggle/Dim requests and groups; shorter two-button tiles; three-button-height Scheduler');
  console.log('PASS: 24-hour/ISO dates across locales, midnight, DST and offsets; compact phone layout, configurable symbols and scheduler controls (synthetic API)');
  console.log('PASS: independent group feedback, stable text through requests/queue/polls, accurate partial results');

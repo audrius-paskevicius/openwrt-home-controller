@@ -4,7 +4,7 @@ Read the [full disclaimer](../DISCLAIMER.txt) before building or installing.
 
 The repository is self-contained: application and UI source, radio helper, driver
 patch, package scripts, tests, documentation and public package verification key are
-included. External inputs are the Go toolchain, OpenWrt SDK/package sources and
+included. External inputs are the Go toolchain, modules pinned in go.mod/go.sum, OpenWrt SDK/package sources and
 Telldus upstream source. The build scripts target OpenWrt 25.12 on ARMv7
 (mvebu/cortexa9). Other targets require changing the SDK, Go architecture settings
 and APK architecture metadata, then rebuilding the backend, driver and radio helper.

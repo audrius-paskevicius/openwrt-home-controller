@@ -37,15 +37,16 @@ var idRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 var errNoSolarEvent = errors.New("solar event does not occur")
 
 type Device struct {
-	Type      string `json:"type,omitempty"`
-	Protocol  string `json:"protocol,omitempty"`
-	HouseCode string `json:"house_code,omitempty"`
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	RadioID   int    `json:"radio_id"`
-	House     int    `json:"house"`
-	Unit      int    `json:"unit"`
-	Icon      string `json:"icon,omitempty"`
+	IKEA      *IKEATarget `json:"ikea,omitempty"`
+	Type      string      `json:"type,omitempty"`
+	Protocol  string      `json:"protocol,omitempty"`
+	HouseCode string      `json:"house_code,omitempty"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	RadioID   int         `json:"radio_id"`
+	House     int         `json:"house"`
+	Unit      int         `json:"unit"`
+	Icon      string      `json:"icon,omitempty"`
 }
 type Group struct {
 	ID      string   `json:"id"`
@@ -54,6 +55,7 @@ type Group struct {
 	Icon    string   `json:"icon,omitempty"`
 }
 type Schedule struct {
+	ActionValue
 	ID       string `json:"id"`
 	Enabled  bool   `json:"enabled"`
 	Target   string `json:"target"`
@@ -97,6 +99,7 @@ type Session struct {
 	Device   string `json:"device"`
 }
 type Command struct {
+	ActionValue
 	Device  string
 	Action  string
 	Source  string
@@ -110,6 +113,7 @@ type DeviceState struct {
 	At     int64  `json:"at"`
 }
 type Event struct {
+	ActionValue
 	At     int64  `json:"at"`
 	Device string `json:"device"`
 	Action string `json:"action"`
@@ -117,6 +121,7 @@ type Event struct {
 	Result string `json:"result"`
 }
 type Server struct {
+	ikea             *ikeaManager
 	mu               sync.Mutex
 	config           Config
 	cred             Credential
@@ -211,7 +216,7 @@ func validateSharedAccount(user, password string) error {
 	return nil
 }
 func validAction(s string) bool {
-	return s == "up" || s == "stop" || s == "down" || s == "on" || s == "off" || s == "toggle" || s == "dim"
+	return s == "brightness" || s == "temperature" || s == "color" || s == "up" || s == "stop" || s == "down" || s == "on" || s == "off" || s == "toggle" || s == "dim"
 }
 func validTime(s string, optional bool) bool {
 	if s == "" {
@@ -256,14 +261,16 @@ func validate(c Config) error {
 		if !validIcon(d.Icon) {
 			return errors.New("invalid device symbol")
 		}
-		if !idRE.MatchString(d.ID) || ids[d.ID] || len(d.Name) < 1 || len(d.Name) > 80 || d.RadioID < 1 || d.RadioID > 65535 || radios[d.RadioID] {
+		if !idRE.MatchString(d.ID) || ids[d.ID] || len(d.Name) < 1 || len(d.Name) > 80 || (d.deviceType() != "ikea" && (d.RadioID < 1 || d.RadioID > 65535 || radios[d.RadioID])) {
 			return errors.New("invalid or duplicate device")
 		}
 		if err := validateDeviceType(d); err != nil {
 			return err
 		}
 		ids[d.ID] = true
-		radios[d.RadioID] = true
+		if d.deviceType() != "ikea" {
+			radios[d.RadioID] = true
+		}
 	}
 	for _, g := range c.Groups {
 		if !validIcon(g.Icon) {
@@ -271,6 +278,9 @@ func validate(c Config) error {
 		}
 		if !idRE.MatchString(g.ID) || ids[g.ID] || len(g.Name) < 1 || len(g.Name) > 80 || len(g.Devices) == 0 || len(g.Devices) > 64 {
 			return errors.New("invalid group")
+		}
+		if c.targetType(g.ID) == "ikea" {
+			return errors.New("select an IKEA group as an IKEA target; membership is managed by IKEA")
 		}
 		if c.targetType(g.ID) == "" {
 			return errors.New("group members must have the same device type")
@@ -297,6 +307,9 @@ func validate(c Config) error {
 	for _, s := range c.Schedules {
 		if !idRE.MatchString(s.ID) || seen[s.ID] || !ids[s.Target] || !c.supportsAction(s.Target, s.Action) || len(s.Days) == 0 || len(s.Days) > 7 || s.Offset < -720 || s.Offset > 720 {
 			return errors.New("invalid schedule")
+		}
+		if err := validateActionValue(s.Action, s.ActionValue); err != nil {
+			return err
 		}
 		seen[s.ID] = true
 		for _, d := range s.Days {
@@ -482,7 +495,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		devices := []map[string]any{}
 		for _, d := range s.config.Devices {
-			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "type": d.deviceType(), "state": s.states[d.ID]})
+			devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "icon": d.Icon, "type": d.deviceType(), "state": s.states[d.ID], "ikea": s.ikeaTarget(d)})
 		}
 		groups := []map[string]any{}
 		for _, g := range s.config.Groups {
@@ -512,6 +525,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var v struct {
+			ActionValue
 			Target string `json:"target"`
 			Action string `json:"action"`
 		}
@@ -519,7 +533,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "invalid command")
 			return
 		}
-		if e := s.enqueue(v.Target, v.Action, "manual"); e != nil {
+		if e := s.enqueueValue(v.Target, v.Action, "manual", v.ActionValue); e != nil {
 			fail(w, 400, e.Error())
 			return
 		}
@@ -543,6 +557,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Server) enqueue(target, action, source string) error {
+	return s.enqueueValue(target, action, source, ActionValue{})
+}
+func (s *Server) enqueueValue(target, action, source string, value ActionValue) error {
+	if err := validateActionValue(action, value); err != nil {
+		return err
+	}
 	if !s.config.supportsAction(target, action) {
 		return errors.New("action is not supported by this target")
 	}
@@ -580,13 +600,13 @@ func (s *Server) enqueue(target, action, source string) error {
 	for _, id := range ids {
 		q := []Command{}
 		for _, c := range s.queue {
-			if c.Device != id || dimmer {
+			if c.Device != id || dimmer || (s.config.targetType(target) == "ikea" && c.Action != action) {
 				q = append(q, c)
 			} else {
 				s.finishCommand(c, "Superseded", time.Now())
 			}
 		}
-		cmd := Command{Device: id, Action: action, Source: source, Expires: time.Now().Add(30 * time.Second), Target: target, Request: request}
+		cmd := Command{ActionValue: value, Device: id, Action: action, Source: source, Expires: time.Now().Add(30 * time.Second), Target: target, Request: request}
 		if action == "stop" {
 			q = append([]Command{cmd}, q...)
 		} else {
@@ -603,6 +623,14 @@ func (s *Server) enqueue(target, action, source string) error {
 	return nil
 }
 func (s *Server) send(c Command) error {
+	for _, d := range s.config.Devices {
+		if d.ID == c.Device && d.deviceType() == "ikea" {
+			if s.ikea == nil {
+				return errors.New("IKEA gateway unavailable")
+			}
+			return s.ikea.send(*d.IKEA, c.Action, c.ActionValue, c.Expires)
+		}
+	}
 	if !s.config.supportsAction(c.Device, c.Action) {
 		return errors.New("action is not supported by this device")
 	}
@@ -657,7 +685,7 @@ func (s *Server) worker() {
 			}
 			s.mu.Lock()
 			s.finishCommand(c, result, time.Now())
-			s.history = append(s.history, Event{time.Now().Unix(), c.Device, c.Action, c.Source, result})
+			s.history = append(s.history, Event{ActionValue: c.ActionValue, At: time.Now().Unix(), Device: c.Device, Action: c.Action, Source: c.Source, Result: result})
 			if len(s.history) > 100 {
 				s.history = s.history[len(s.history)-100:]
 			}
@@ -774,7 +802,7 @@ func (s *Server) due(last, now time.Time, seen map[string]bool) {
 			t, e := s.eventTime(rule, day)
 			if e == nil && t.After(last) && !t.After(now) {
 				seen[key] = true
-				s.enqueue(rule.Target, rule.Action, "schedule")
+				s.enqueueValue(rule.Target, rule.Action, "schedule", rule.ActionValue)
 			}
 		}
 	}
@@ -847,6 +875,8 @@ func serve() error {
 		ln.Close()
 		return e
 	}
+	s.ikea = newIKEA()
+	go s.ikea.loop()
 	go s.worker()
 	go s.scheduler()
 	return (&http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, MaxHeaderBytes: 8192}).Serve(ln)

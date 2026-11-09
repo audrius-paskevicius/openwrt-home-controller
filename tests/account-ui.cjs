@@ -115,5 +115,14 @@ const form={JSONMap,NamedSection:Section,GridSection:class extends Section{},Val
  respond=()=>Promise.resolve({ok:true});await view.handleSave();saved=JSON.parse(calls.at(-1).args[0]);
  assert.equal(saved.devices[0].type,'blind');assert.equal(saved.devices[1].type,'switch');assert.equal(saved.devices[1].house_code,'C');assert.equal(saved.devices[1].protocol,'arctech');assert.equal(saved.schedules[0].action,'off');assert.equal(saved.control_order.filter(x=>x==='scheduler').length,1);
  assert.equal(saved.devices[2].type,'dimmer');assert.equal(saved.devices[2].house_code,'D');assert.equal(saved.devices[2].house,0);assert.equal(saved.devices[2].protocol,'arctech');assert.ok(saved.control_order.includes('device:dimmer'));
+ const ikeaTarget={gateway:'test-gateway',kind:'device',id:123,capabilities:{power:true,brightness:true,temperature:true,color:true},name:'IKEA sample',reachable:true};
+ const withIKEA=JSON.parse(JSON.stringify(typed));withIKEA.devices.push({id:'ikea',name:'My chosen name',type:'ikea',radio_id:0,house:0,unit:0,ikea:ikeaTarget});withIKEA.schedules=[{id:'colour',enabled:true,target:'ikea',action:'color',color:'#ff8000',days:[1],event:'time',time:'20:00'}];
+ await view.renderSettings({...data,config:withIKEA,ikea:{configured:true,connected:true,targets:[ikeaTarget]}});
+ const ikeaSchedule=view.map.children.find(s=>s.type==='scheduling').getOption('_schedules').subsection;
+ ikeaSchedule.addModalOptions(ikeaSchedule,'schedule_0');assert.deepEqual(ikeaSchedule.getOption('action').keylist,['on','off','brightness','temperature','color']);
+ await view.handleSave();saved=JSON.parse(calls.at(-1).args[0]);assert.equal(saved.devices.at(-1).name,'My chosen name');assert.equal(saved.devices.at(-1).ikea.id,123);assert.equal(saved.devices.at(-1).radio_id,0);assert.equal(saved.schedules[0].color,'#ff8000');assert.equal(saved.schedules[0].value,undefined);
+ assert(!JSON.stringify(saved).includes('security_code'));assert(!JSON.stringify(saved).includes('_ikea_code'));
+ view.map.data.set('json','schedule_0','action','brightness');view.map.data.set('json','schedule_0','brightness','37');await view.handleSave();saved=JSON.parse(calls.at(-1).args[0]);assert.equal(saved.schedules[0].value,37);assert.equal(saved.schedules[0].color,undefined);
+ console.log('PASS: IKEA target identity/local name, capability-aware schedules, colour/brightness round trips and credential exclusion');
  console.log('PASS: native-form handlers, Save/Apply/Reset, credential exclusion, current controller list/capabilities, preference submission, unplug reset and no preference restoration');
 })().catch(e=>{console.error(e);process.exitCode=1;});

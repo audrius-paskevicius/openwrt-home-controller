@@ -334,3 +334,36 @@ These tests do not prove physical blind movement or position: the installed
 transmitter and blinds provide no position feedback. They also do not establish
 compatibility with every TellStick model, router, VPN arrangement or future firmware.
 See the [disclaimer](../DISCLAIMER.txt).
+
+## IKEA integration (0.4.0)
+
+Verified on an E1526 gateway and the ARMv7 router: authenticated device/group reads;
+capability detection for plugs, white bulbs, colour bulbs and mixed groups; remotes
+excluded from controllable targets. With explicit user authorization, a colour bulb
+accepted brightness, hue/saturation and white-temperature commands. Gateway reports
+confirmed each change. Its original power, brightness, hue, saturation and white
+temperature were restored and verified. This confirms reported values, not measured
+light output or colour accuracy. Other device models remain untested.
+
+Automated checks cover action/range validation, scheduled values, independent queued
+settings, mixed-group parsing, offline state, API authentication/CSRF, credential
+exclusion, confirmable retry/separate responses and blockwise CoAP reads. Chrome checks
+cover fixed four-row tiles at 320/390/1280px, commit-only sliders, stable status text,
+unavailable controls and existing radio/scheduler/disclaimer behavior. Native LuCI was
+checked with unsaved synthetic targets/rules for target selection, initial naming,
+colour input and action-dependent schedule fields.
+
+`TestIKEARouterRead` requires `HC_IKEA_READ_TEST=1` on the router and reads existing
+credentials in place. Optional `HC_IKEA_INVENTORY=/tmp/<file>` writes only inventory.
+`TestIKEARouterControlAndRestore` is never enabled in normal tests or CI: it requires
+explicit physical-test authorization plus `HC_IKEA_WRITE_TEST=1` and a numeric
+`HC_IKEA_WRITE_TARGET`. It changes the selected bulb and restores its original values;
+a root-only temporary restoration record is retained if restoration cannot be verified.
+
+The signed 0.4.0 APK was installed and all payload files matched the build inputs.
+Existing control configuration, shared login, scheduler preference and router network,
+firewall and LuCI configuration remained unchanged. Installed discovery and Reconnect
+were verified; reauthentication generated a service-owned private key file using the
+stored code. Installed desktop/phone assets were checked under production CSP with
+synthetic state and control writes blocked. No IKEA tiles or schedules were added by
+these checks. Source and extracted payload scans found no deployment credentials.

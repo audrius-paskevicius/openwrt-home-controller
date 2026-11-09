@@ -10,6 +10,7 @@ type SchedulerPreference struct {
 	Stopped bool `json:"stopped"`
 }
 type NextAction struct {
+	ActionValue
 	At     time.Time `json:"at"`
 	Target string    `json:"target"`
 	Action string    `json:"action"`
@@ -110,7 +111,7 @@ func (s *Server) schedulerStatus(now time.Time) SchedulerStatus {
 						name = g.Name
 					}
 				}
-				next = &NextAction{at, name, rule.Action}
+				next = &NextAction{ActionValue: rule.ActionValue, At: at, Target: name, Action: rule.Action}
 			}
 			break
 		}

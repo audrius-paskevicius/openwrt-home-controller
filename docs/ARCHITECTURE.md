@@ -16,8 +16,8 @@ uHTTPd service reads `/etc/config/uhttpd` and serves LuCI independently; this pa
 does not create a section there. Removing its `main` section affects LuCI, while
 removing the uHTTPd executable/dependency affects both applications.
 
-The Go controller uses the standard library; no Go modules are downloaded. The Go
-runtime is compiled into the executable. Neither Perl nor Python is needed on the
+The Go controller uses the standard library plus pinned Pion DTLS and go-coap wire-codec modules for IKEA. The Go
+runtime and these dependencies are compiled into the executable. Neither Perl nor Python is needed on the
 router. A small C helper calls the Telldus library's Up, Down, Stop, TurnOn and TurnOff functions,
 after checking the device's supported-method mask.
 The patched Telldus daemon performs USB communication.
@@ -148,7 +148,7 @@ No physical position feedback is available: a successful send is not a position 
 
 ## Commands and schedules
 
-Device `type` selects Blind, Switch or BH004 Dimmer behavior; a missing type means Blind for
+Device `type` selects Blind, Switch, BH004 Dimmer, or IKEA behavior; a missing type means Blind for
 older configurations. `protocol` is restricted to Hasta for blinds and Arctech
 for switches/dimmers, with the corresponding fixed driver models `selflearningv2` and
 `codeswitch`. Blinds retain numeric `house`; switches/dimmers use an A–P `house_code`
@@ -209,3 +209,59 @@ execution. A runtime snapshot is refreshed every five seconds for LuCI status.
 MQTT is not included. The controller queue is the intended integration
 point for a future optional adapter, so that MQTT cannot bypass validation, ordering
 or expiry. No broker or MQTT listener is installed by this package.
+
+## IKEA gateway
+
+IKEA Home smart 1 remains responsible for pairing, discovery, names and group membership.
+Home Controller imports no tiles automatically. An IKEA tile stores a gateway identity,
+numeric resource ID, device/group kind and last-known capabilities, plus independent
+local name, icon and order. Renaming a target in IKEA does not rename an existing tile.
+Removed/unreachable targets remain configured and recover when available. Local radio
+Group controls exclude IKEA; choose an IKEA group directly as an IKEA target.
+
+The backend initiates authenticated DTLS-PSK connections to the configured private IP,
+UDP 5684. No new listening ports, firewall exceptions, browser-to-gateway connections,
+cloud login, shell interpolation or arbitrary CoAP paths are introduced. Only LuCI's
+administrator RPC can set or reconnect the gateway. Control commands retain their
+existing login, same-origin and CSRF requirements.
+
+`/etc/home-controller/ikea/credentials.json` stores the address, gateway identity,
+printed security code and any migrated client credentials. It is root-owned, mode 0640,
+in a root:homecontroller 0750 directory: only root and the service account can read it.
+Newly generated client credentials live in the service-owned, mode 0600
+`/etc/home-controller/state/ikea-auth.json`. Neither file enters configuration JSON,
+browser responses, diagnostics, source archives or APKs. They ARE included in the
+router's protected OpenWrt backup of `/etc/home-controller/`; protect those backups.
+
+The saved generated key handles reconnection; failed authentication can bootstrap a
+new client key using the stored printed code. Reconnect clears the generated key and
+restarts Home Controller. A changed printed code creates a different gateway identity,
+so old tile IDs cannot silently select targets on a replacement gateway. Blank code
+keeps the saved code. Gateway address changes are explicit; automatic IP discovery is
+not implemented. A DHCP reservation is useful if the gateway's address changes.
+
+Discovery polls devices and groups every 15 seconds and after commands, serialized
+with writes. Remotes are omitted from controllable targets. Group capabilities are the
+union of controllable members; On/Off affects plugs and lamps, while brightness,
+white temperature and colour affect only supporting lamps. Writes are per member,
+so a mixed group never sends light settings to a plug. Partial failures are reported;
+there is no rollback or replay. Expired queued commands are not sent.
+
+Group state is derived from member reports rather than the gateway's potentially stale
+group attributes. Different member values show Mixed, and partial availability is shown
+quietly. UI updates do not replace the tile or change focused/actively edited controls.
+Only committed slider/colour selections send commands. White bulbs use double-width
+three-row tiles and colour bulbs four rows; each row uses the standard 46px button
+height and 8px gap. Plugs retain compact two-button tiles.
+
+IKEA actions are On, Off, brightness (0–100%), white temperature (2200–4000 K), and
+colour (#RRGGBB hue/saturation, brightness independent). Brightness >0, white and colour
+turn lamps on; brightness 0 turns them off. These semantics are identical for manual
+and scheduled actions. Pending changes coalesce only within the same setting;
+brightness and colour scheduled together are both retained. The scheduler preview and
+command history retain values. BH004 dimmers retain their separate Toggle/Dim behavior.
+
+The constrained CoAP exchange uses library codecs with authenticated DTLS, confirmable
+retransmissions, token/MID matching, separate-response acknowledgements and bounded
+Block2 reads. It does not use the library's full UDP client, which exhibited an unaligned
+64-bit atomic operation on the ARMv7 target. Network reads and response sizes are bounded.

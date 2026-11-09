@@ -2,7 +2,7 @@
 let csrf='',signedIn=false,refreshing=false,signature='',revision=0;
 let disclaimer='',acknowledged=false,warningOpen=false;
 const warningKey='home-controller-disclaimer';
-const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim'};
+const $=id=>document.getElementById(id),labels={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour'};
 const put=(el,text)=>{if(el.textContent!==text)el.textContent=text;};
 async function api(path,body){
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
@@ -76,6 +76,7 @@ function heading(name,symbol,fallback){
  const kind=symbol||fallback;if(symbolPaths[kind]){const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');svg.classList.add('symbol');svg.dataset.symbol=kind;path.setAttribute('d',symbolPaths[kind]);svg.append(path);row.append(svg);}return row;
 }
 function card(item,group){
+ if(item.type==='ikea')return ikeaCard(item);
  const el=document.createElement('article');el.className='card'+(group?' group':'');el.dataset.id=item.id;el.dataset.type=item.type||'blind';
  const title=heading(item.name,item.icon,item.type==='dimmer'?'lamp':item.type==='switch'?'plug':'blind');
  const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');status.textContent=group?'':['switch','dimmer'].includes(item.type)?'State unknown':'Position unknown';
@@ -83,6 +84,42 @@ function card(item,group){
  for(const action of item.type==='dimmer'?['toggle','dim']:item.type==='switch'?['on','off']:['up','stop','down']){const button=document.createElement('button');button.type='button';button.textContent=labels[action];button.className=action;button.setAttribute('aria-label',item.name+': '+labels[action]);if(action==='dim')button.title='Start or stop changing brightness while the lamp is on';if(action==='toggle')button.title='Toggle power on or off';
   button.onclick=async()=>{if(item.type==='dimmer'&&el.dataset.busy)return;revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';el.setAttribute('aria-busy','true');try{await api('command',{target:item.id,action});if(request===el.request){put($('message'),'');setTimeout(refresh,700);}}catch(e){if(request===el.request){el.classList.add('error');put(status,e.message);}}finally{if(request===el.request){delete el.dataset.busy;el.removeAttribute('aria-busy');}}};buttons.append(button);}
  el.append(title,status,buttons);return el;
+}
+function ikeaCard(item){
+ const info=item.ikea||{},caps=info.capabilities||{},wide=!!caps.brightness;
+ const el=document.createElement('article');el.className='card ikea'+(wide?' wide':'')+(info.kind==='group'?' group':'');el.dataset.id=item.id;el.dataset.type='ikea';
+ const status=document.createElement('p');status.className='status';status.setAttribute('aria-live','polite');
+ const controls=document.createElement('div');controls.className='buttons ikea-controls';
+ const power=document.createElement('div');power.className=wide?'power-row':'buttons';
+ const send=async(action,extra={})=>{revision++;const request=el.request=(el.request||0)+1;el.dataset.busy='true';delete el.dataset.clientError;try{await api('command',{target:item.id,action,...extra});setTimeout(refresh,700);}catch(e){if(request===el.request){el.dataset.clientError=e.message;put(status,e.message);el.classList.add('error');}}finally{if(request===el.request)delete el.dataset.busy;}};
+ for(const action of ['on','off']){const b=document.createElement('button');b.type='button';b.className=action;b.textContent=labels[action];b.setAttribute('aria-label',item.name+': '+labels[action]);b.onclick=()=>send(action);power.append(b);}controls.append(power);
+ for(const action of ['brightness','temperature','color']){
+  if(!caps[action])continue;
+  const row=document.createElement('label');row.className='ikea-row';const text=document.createElement('span');text.textContent=action==='temperature'?'White':labels[action];
+  const input=document.createElement('input');input.type=action==='color'?'color':'range';input.dataset.action=action;input.setAttribute('aria-label',item.name+': '+labels[action]);
+  const output=document.createElement('output');output.dataset.value=action;
+  if(action==='color'){input.value='#ffffff';input.title='Choose hue and saturation; use Brightness for light level';}
+  else{input.min=action==='brightness'?'0':'2200';input.max=action==='brightness'?'100':'4000';input.step=action==='brightness'?'1':'50';input.value=action==='brightness'?'100':'2700';}
+  const label=()=>input.type==='color'?input.value.toUpperCase():input.value+(action==='brightness'?'%':' K');
+  input.oninput=()=>{put(output,label());input.setAttribute('aria-valuetext',label());};
+  input.onchange=()=>{input.oninput();send(action,action==='color'?{color:input.value}:{value:Number(input.value)});};
+  row.append(text,input,output);controls.append(row);
+ }
+ el.append(heading(item.name,item.icon,wide?'lamp':'plug'),status,controls);renderIKEA(el,item);return el;
+}
+function renderIKEA(el,item){
+ if(!el)return;const live=item.ikea||{},available=!!live.reachable;
+ let text=!available?'Unavailable':live.power===true?'On':live.power===false?'Off':'Mixed';if(available&&live.partial)text+=' · Some unavailable';
+ const failure=item.state?.status&&!['Queued','Sent (position unknown)','Superseded','Schedule cancelled'].includes(item.state.status)?item.state.status:'';
+ if(el.dataset.clientError||failure)text=el.dataset.clientError||failure;
+ put(el.querySelector('.status'),text);el.classList.toggle('error',!!(el.dataset.clientError||failure));
+ el.querySelectorAll('button,input').forEach(input=>{input.disabled=!available;});
+ for(const action of ['brightness','temperature','color']){
+  const input=el.querySelector('[data-action="'+action+'"]'),output=el.querySelector('[data-value="'+action+'"]');if(!input||el.dataset.busy||document.activeElement===input)continue;
+  const value=live[action],known=available&&value!=null&&value!==-1&&value!=='mixed';
+  if(known)input.value=String(value);
+  const text=known?(action==='color'?String(value).toUpperCase():value+(action==='brightness'?'%':' K')):available?'Mixed':'—';put(output,text);input.setAttribute('aria-valuetext',text);
+ }
 }
 function schedulerCard(symbol){
  const el=document.createElement('article');el.className='card scheduler';el.id='scheduler';
@@ -103,15 +140,15 @@ function renderScheduler(state){
  if(state.running&&state.enabled_schedules)detail='No upcoming event in the next week';
  const at=next.querySelector('time'),hasNext=!!(state.running&&state.next);
  at.hidden=!hasNext;
- if(hasNext){detail='Next: '+state.next.target+' '+(labels[state.next.action]||state.next.action);put(at,dateText(state.next.at,state.timezone));at.dateTime=state.next.at;at.title=(state.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+state.next.at;}
+ if(hasNext){detail='Next: '+state.next.target+' '+(labels[state.next.action]||state.next.action)+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':'%'):state.next.color?' '+state.next.color.toUpperCase():'');put(at,dateText(state.next.at,state.timezone));at.dateTime=state.next.at;at.title=(state.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+state.next.at;}
  put(next.querySelector('.next-event'),detail);el.querySelector('.start').disabled=state.running;el.querySelector('.stop').disabled=!state.running;
 }
 async function refresh(){
  if(refreshing||!acknowledged||warningOpen)return;refreshing=true;const before=revision;
- try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon,d.type]),groups,data.scheduler_icon,data.control_order]);
+ try{const data=await api('state');if(before!==revision)return;csrf=data.csrf;const groups=data.groups||[],key=JSON.stringify([data.devices.map(d=>[d.id,d.name,d.icon,d.type,d.ikea?.capabilities]),groups,data.scheduler_icon,data.control_order]);
   if(key!==signature){const cards=new Map([...data.devices.map(d=>['device:'+d.id,card(d,false)]),['scheduler',schedulerCard(data.scheduler_icon)],...groups.map(g=>['group:'+g.id,card(g,true)])]);const order=[...new Set([...(data.control_order||[]),...cards.keys()])];$('controls').replaceChildren(...order.filter(id=>cards.has(id)).map(id=>cards.get(id)));signature=key;}
   signedIn=true;$('login').hidden=true;$('controls').hidden=false;$('logout').hidden=false;put($('message'),'');
-  for(const d of data.devices)renderResult([...$('controls').children].find(x=>x.dataset.id===d.id),d.state,false);
+  for(const d of data.devices){const el=[...$('controls').children].find(x=>x.dataset.id===d.id);if(d.type==='ikea')renderIKEA(el,d);else renderResult(el,d.state,false);}
   for(const g of groups)renderResult([...$('controls').children].find(x=>x.dataset.id===g.id),data.group_states?.[g.id],true);
   renderScheduler(data.scheduler);
  }catch(e){if(!signedIn)showLogin();else{const el=$('scheduler');if(el){put(el.querySelector('.status'),'Connection unavailable');el.querySelectorAll('button').forEach(b=>b.disabled=true);}}if(e.message!=='login required')put($('message'),'Connection interrupted. '+e.message);}

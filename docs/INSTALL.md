@@ -292,3 +292,23 @@ firewall table. It does not restore the previous `/etc/tellstick.conf` or stop/r
 the independently managed `telldusd` service. Review retained account files and
 Telldus configuration before purging private files or reusing the transmitter with
 another application.
+
+## IKEA Home smart 1
+
+In **Advanced**, enter the TRÅDFRI gateway's private IP address and printed security
+code, then **Connect**. With saved credentials, leave the code blank and use
+**Reconnect** if needed. Connection changes apply immediately and restart the service;
+other form edits still use Save / Save & Apply. No IKEA account password is required.
+The service must be enabled to discover targets.
+
+In **Controls → Add device or group**, choose **IKEA**, then an existing device or group.
+The initial name is copied when the name field is empty. Set your preferred name,
+symbol and position, then Save & Apply. Existing IKEA group membership stays managed
+by IKEA Home smart 1. Discovery does not add tiles or rearrange them automatically.
+Remotes are not selectable control targets.
+
+Plugs have On/Off. Supported lamps expose brightness, white temperature and colour
+in fixed rows. The scheduler offers the same actions and values. Colour sets hue and
+saturation; use brightness separately for light level. White/colour and positive
+brightness actions turn lamps on. An unavailable gateway or target leaves its tile in
+place. Credentials stay on the router; protect backups, which include those secrets.

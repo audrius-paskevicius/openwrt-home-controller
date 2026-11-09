@@ -10,7 +10,14 @@ func (d Device) deviceType() string {
 }
 
 func validateDeviceType(d Device) error {
+	if d.deviceType() != "ikea" && d.IKEA != nil {
+		return errors.New("IKEA target requires IKEA device type")
+	}
 	switch d.deviceType() {
+	case "ikea":
+		if d.IKEA == nil || d.IKEA.Gateway == "" || len(d.IKEA.Gateway) > 80 || d.IKEA.ID < 1 || d.IKEA.ID > 2147483647 || (d.IKEA.Kind != "device" && d.IKEA.Kind != "group") || !d.IKEA.Capabilities.Power || d.RadioID != 0 || d.Protocol != "" || d.HouseCode != "" || d.House != 0 || d.Unit != 0 {
+			return errors.New("choose an IKEA device or group")
+		}
 	case "blind":
 		if (d.Protocol != "" && d.Protocol != "hasta") || d.HouseCode != "" || d.House < 1 || d.House > 65535 || d.Unit < 0 || d.Unit > 15 {
 			return errors.New("blind requires Hasta, house 1..65535 and unit 0..15")
@@ -57,6 +64,24 @@ func (c Config) targetType(target string) string {
 }
 
 func (c Config) supportsAction(target, action string) bool {
+	if c.targetType(target) == "ikea" {
+		for _, d := range c.Devices {
+			if d.ID == target && d.IKEA != nil {
+				return d.IKEA.Capabilities.supports(action)
+			}
+		}
+		for _, g := range c.Groups {
+			if g.ID == target {
+				for _, id := range g.Devices {
+					if !c.supportsAction(id, action) {
+						return false
+					}
+				}
+				return true
+			}
+		}
+		return false
+	}
 	switch c.targetType(target) {
 	case "blind":
 		return action == "up" || action == "stop" || action == "down"

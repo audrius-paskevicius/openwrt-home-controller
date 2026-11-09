@@ -13,15 +13,16 @@ const discard=rpc.declare({object:'home-controller',method:'discard',expect:{}})
 const password=rpc.declare({object:'home-controller',method:'password',params:['user','password'],expect:{}});
 const revoke=rpc.declare({object:'home-controller',method:'revoke',expect:{}});
 const sessions=rpc.declare({object:'home-controller',method:'sessions',expect:{}});
+const ikeaConnect=rpc.declare({object:'home-controller',method:'ikea',params:['address','code'],expect:{}});
 const tls=rpc.declare({object:'home-controller',method:'tls',expect:{}});
 const clone=x=>JSON.parse(JSON.stringify(x));
 const symbols={none:'None',blind:'Blind',clock:'Clock',lamp:'Lamp',plug:'Plug',fan:'Fan'};
-const kinds={switch:'Switch',dimmer:'Dimmer',blind:'Blind',group:'Group',scheduler:'Scheduler'};
-const isDevice=d=>['blind','switch','dimmer'].includes(d.kind);
+const kinds={switch:'Switch',dimmer:'Dimmer',blind:'Blind',ikea:'IKEA',group:'Group',scheduler:'Scheduler'};
+const isDevice=d=>['blind','switch','dimmer','ikea'].includes(d.kind);
 const isCodeSwitch=d=>d.kind==='switch'||d.kind==='dimmer';
 const defaultSymbol=kind=>kind==='dimmer'?'lamp':kind==='switch'?'plug':'blind';
 const deviceKind=d=>d.type||'blind';
-const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim'};
+const actions={up:'Up',stop:'Stop',down:'Down',on:'On',off:'Off',toggle:'Toggle',dim:'Dim',brightness:'Brightness',temperature:'White temperature',color:'Colour'};
 const events={time:'Fixed time',sunrise:'Sunrise',sunset:'Sunset',dawn:'Civil dawn',dusk:'Civil dusk'};
 const weekdays=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['0','Sun']];
 function result(r){if(r.error)throw Error(r.error);return r;}
@@ -68,11 +69,11 @@ function command(section,name,title,caption,handler){
  };return o;
 }
 function model(c){
- const controls=[...c.devices.map(d=>({...d,kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',dimmer_protocol:d.protocol||'arctech',icon:d.icon||defaultSymbol(deviceKind(d))})),
+ const controls=[...c.devices.map(d=>({...d,ikea_target:d.ikea?d.ikea.kind+':'+d.ikea.id:'',kind:deviceKind(d),blind_protocol:d.protocol||'hasta',switch_protocol:d.protocol||'arctech',dimmer_protocol:d.protocol||'arctech',icon:d.icon||defaultSymbol(deviceKind(d))})),
   {id:'scheduler',name:'Scheduler',kind:'scheduler',icon:c.scheduler_icon||'clock'},...c.groups.map(g=>({...g,kind:'group',icon:g.icon||defaultSymbol(c.devices.find(d=>d.id===g.devices[0])?.type)}))];
  const order=[...new Set([...(c.control_order||[]),...controls.map(key)])];controls.sort((a,b)=>order.indexOf(key(a))-order.indexOf(key(b)));
  return {general:{enabled:c.enabled?'1':'0'},control:controls.map((d,i)=>({...d,'.name':'control_'+i})),
-  schedule:c.schedules.map((s,i)=>({...s,enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
+  schedule:c.schedules.map((s,i)=>({...s,brightness:s.action==='brightness'?s.value:100,temperature:s.action==='temperature'?s.value:2700,color:s.color||'#ffffff',enabled:s.enabled?'1':'0',days:s.days.map(String),'.name':'schedule_'+i})),
   scheduling:{latitude:c.latitude,longitude:c.longitude,timezone:c.timezone},access:{port:c.port,networks:c.networks,session_days:c.session_days},advanced:{preferred_controller:c.preferred_controller||'automatic'}};
 }
 function configuration(m,original){
@@ -80,10 +81,17 @@ function configuration(m,original){
  c.enabled=m.data.get('json','general','enabled')==='1';c.latitude=Number(settings.latitude);c.longitude=Number(settings.longitude);c.timezone=settings.timezone;
  c.port=Number(m.data.get('json','access','port'));c.networks=list(m.data.get('json','access','networks'));c.session_days=Number(m.data.get('json','access','session_days'));
  c.preferred_controller=m.data.get('json','advanced','preferred_controller')||'automatic';if(c.preferred_controller==='automatic')c.preferred_controller='';
- c.devices=controls.filter(isDevice).map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:d.kind==='dimmer'?d.dimmer_protocol||'arctech':d.kind==='switch'?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(isCodeSwitch(d)?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)}));
+ c.devices=controls.filter(isDevice).map(d=>{
+  if(d.kind==='ikea'){
+   const selected=(m.ikeaTargets||[]).find(t=>t.kind+':'+t.id===d.ikea_target),saved=d.ikea&&d.ikea.kind+':'+d.ikea.id===d.ikea_target?d.ikea:null,t=selected||saved;
+   if(!t)throw Error('Choose an IKEA device or group.');
+   return {id:d.id,name:d.name.trim(),icon:d.icon,type:'ikea',radio_id:0,house:0,unit:0,ikea:{gateway:t.gateway,kind:t.kind,id:t.id,capabilities:t.capabilities}};
+  }
+  return {id:d.id,name:d.name.trim(),icon:d.icon,type:d.kind,protocol:d.kind==='dimmer'?d.dimmer_protocol||'arctech':d.kind==='switch'?d.switch_protocol||'arctech':d.blind_protocol||'hasta',radio_id:Number(d.radio_id),...(isCodeSwitch(d)?{house_code:d.house_code,house:0}:{house:Number(d.house)}),unit:Number(d.unit)};
+ });
  c.groups=controls.filter(d=>d.kind==='group').map(d=>({id:d.id,name:d.name.trim(),icon:d.icon,devices:list(d.devices)}));
  c.scheduler_icon=controls.find(d=>d.kind==='scheduler').icon;c.control_order=controls.map(key);
- c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,days:list(s.days).map(Number),event:s.event,
+ c.schedules=m.data.sections('json','schedule').map(s=>({id:s.id,enabled:s.enabled==='1',target:s.target,action:s.action,...(['brightness','temperature'].includes(s.action)?{value:Number(s.action==='brightness'?s.brightness:s.temperature)}:s.action==='color'?{color:s.color}:{}),days:list(s.days).map(Number),event:s.event,
   time:s.event==='time'?s.time:'',offset:s.event==='time'?0:Number(s.offset||0),earliest:s.event==='time'?'':s.earliest||'',latest:s.event==='time'?'':s.latest||'',fallback:s.event==='time'?'':s.fallback||''}));
  return c;
 }
@@ -97,20 +105,21 @@ function dateText(value,timeZone,withDate=true){
 }
 function nextText(state){
  if(!state)return 'Waiting for service status';if(!state.running)return 'Stopped';if(!state.enabled_schedules)return 'Running · no schedules enabled';if(!state.next)return 'Running · no event in the next week';
- return 'Running · '+state.next.target+' · '+actions[state.next.action]+' · '+dateText(state.next.at,state.timezone);
+ return 'Running · '+state.next.target+' · '+actions[state.next.action]+(state.next.value!=null?' '+state.next.value+(state.next.action==='temperature'?' K':'%'):state.next.color?' '+state.next.color.toUpperCase():'')+' · '+dateText(state.next.at,state.timezone);
 }
 return view.extend({
  load(){return Promise.all([get().then(result),warning.load()]).then(([data,text])=>({...data,disclaimer:text}));},
  render(data){this.disclaimer=data.disclaimer;return warning.gate(data.disclaimer,()=>this.renderSettings(data));},
  async renderSettings(data){
-  this.original=clone(data.config);const m=this.map=new form.JSONMap(model(data.config),'Home Controller');m.tabbed=true;let fresh=data,preferred=null,choiceSignature='';
+  this.original=clone(data.config);const m=this.map=new form.JSONMap(model(data.config),'Home Controller');m.tabbed=true;let fresh=data,preferred=null,choiceSignature='';m.ikeaTargets=data.ikea?.targets||[];const ikeaStatus=E('span');
   const s=m.section(form.NamedSection,'general','general','General');s.hidetitle=true;
   const enabled=s.option(form.Flag,'enabled','Enable service','To pause scheduled actions only, use Scheduler on the control page.');enabled.rmempty=false;
   const service=E('p',{role:'status',hidden:'',class:'alert-message warning'}),controller=E('div'),scheduler=E('span'),links=E('span');
   dummy(s,'_controller','TellSticks',()=>controller);dummy(s,'_scheduler','Scheduler',()=>scheduler);dummy(s,'_links','Control page',()=>links);
+  const putIKEAStatus=()=>{const i=fresh.ikea;ikeaStatus.textContent=i?.connected?'Connected · '+(i.targets||[]).filter(t=>t.kind==='device').length+' devices, '+(i.targets||[]).filter(t=>t.kind==='group').length+' groups':i?.configured?(i.error||'Connecting…'):'Not connected';};
   const updateStatus=d=>{
    const previousPreference=fresh.config.preferred_controller||'automatic';
-   fresh=d;this.connectedControllers=d.controllers||[];const active=d.active_config||d.config;service.hidden=true;service.textContent='';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
+   fresh=d;m.ikeaTargets=d.ikea?.targets||[];putIKEAStatus();this.connectedControllers=d.controllers||[];const active=d.active_config||d.config;service.hidden=true;service.textContent='';scheduler.textContent=active.enabled?nextText(d.status?.scheduler):'Service is disabled';
    const schedule=d.status?.scheduler;scheduler.title=active.enabled&&schedule?.running&&schedule.next?(schedule.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone)+' · '+schedule.next.at:'';
    const devices=d.controllers||[],titles=['Model','Serial','Capabilities','Use'];
    controller.replaceChildren(devices.length?E('table',{class:'table'},[
@@ -138,6 +147,10 @@ return view.extend({
   let o=value(controls,'name','Name','maxlength(80)');o.validate=(_sid,v)=>v.trim()?true:'Enter a name.';
   const typeOption=choice(controls,form.ListValue,'kind','Type',kinds);
   choice(controls,form.ListValue,'icon','Symbol',symbols);
+  const ikeaPick=choice(controls,form.ListValue,'ikea_target','IKEA device or group',{},'Pairing and group membership are managed in IKEA Home smart 1.');ikeaPick.modalonly=true;ikeaPick.depends('kind','ikea');
+  ikeaPick.validate=(_sid,v)=>/^(device|group):[1-9][0-9]*$/.test(v)?true:'Choose an IKEA target.';
+  ikeaPick.onchange=function(_event,sid,v){const target=(m.ikeaTargets||[]).find(t=>t.kind+':'+t.id===v);if(!target)return;const name=this.section.getOption('name');if(!name.formvalue(sid))name.getUIElement(sid)?.setValue(target.name.trim());this.section.getOption('icon').getUIElement(sid)?.setValue(target.capabilities.brightness?'lamp':'plug');};
+
   o=dummy(controls,'_dimmer_help','Dimmer',()=> 'Everspring BH004: Toggle changes power. Dim starts or stops the brightness cycle while on. The same actions can be scheduled. Toggle changes the current power state; Dim requires the lamp to be on. No state or brightness feedback.');o.modalonly=true;o.depends('kind','dimmer');
   o=value(controls,'house','House code','and(uinteger,range(1,65535))','Hasta selflearningv2 radio address.');o.modalonly=true;o.depends('kind','blind');
   o=choice(controls,form.ListValue,'blind_protocol','Radio protocol',{hasta:'Hasta selflearningv2'});o.modalonly=true;o.depends('kind','blind');o.default='hasta';
@@ -147,11 +160,12 @@ return view.extend({
   o=value(controls,'unit','Unit','and(uinteger,range(0,16))');o.modalonly=true;o.depends('kind','blind');o.depends('kind','switch');o.depends('kind','dimmer');
   o.validate=function(sid,v){const kind=this.section.getOption('kind').formvalue(sid),n=Number(v);return Number.isInteger(n)&&n>=(kind!=='blind'?1:0)&&n<=(kind!=='blind'?16:15)?true:kind!=='blind'?'Use unit 1 to 16.':'Use unit 0 to 15.';};
   o=controls.option(form.MultiValue,'devices','Devices','Choose devices of one type.');o.modalonly=true;o.rmempty=false;o.depends('kind','group');
-  o.validate=(_sid,v)=>{const ids=list(v),devices=m.data.sections('json','control').filter(d=>ids.includes(d.id));return ids.length&&devices.length===ids.length&&devices.every(isDevice)&&new Set(devices.map(d=>d.kind)).size===1?true:'Choose one or more devices of the same type.';};
+  o.validate=(_sid,v)=>{const ids=list(v),devices=m.data.sections('json','control').filter(d=>ids.includes(d.id));return ids.length&&devices.length===ids.length&&devices.every(d=>isDevice(d)&&d.kind!=='ikea')&&new Set(devices.map(d=>d.kind)).size===1?true:'Choose one or more devices of the same type.';};
   controls.addModalOptions=function(section,sid){
    const d=m.data.get('json',sid),type=section.getOption('kind'),members=section.getOption('devices');type.readonly=m.addedSection!==sid;type.keylist=[];type.vallist=[];
    Object.entries(kinds).filter(([k])=>k!=='scheduler'||d.kind==='scheduler').forEach(([k,v])=>type.value(k,v));section.getOption('name').readonly=d.kind==='scheduler';
-   members.keylist=[];members.vallist=[];m.data.sections('json','control').filter(isDevice).forEach(x=>members.value(x.id,x.name));
+   const pick=section.getOption('ikea_target');pick.keylist=[];pick.vallist=[];(m.ikeaTargets||[]).forEach(t=>pick.value(t.kind+':'+t.id,(t.kind==='group'?'Group: ':'Device: ')+t.name+' ('+t.id+')'+(t.reachable?'':' — unavailable')));if(d.ikea_target&&!pick.keylist.includes(d.ikea_target))pick.value(d.ikea_target,'Unavailable ('+d.ikea_target+')');
+   members.keylist=[];members.vallist=[];m.data.sections('json','control').filter(d=>isDevice(d)&&d.kind!=='ikea').forEach(x=>members.value(x.id,x.name));
   };
   controls.handleAdd=function(){
    const id='control_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','control',id),used=new Set(m.data.sections('json','control').map(x=>Number(x.radio_id)));let radio=1;while(used.has(radio))radio++;
@@ -168,6 +182,10 @@ return view.extend({
   const grid=scheduling.option(form.SectionValue,'_schedules',form.GridSection,'schedule').subsection;grid.anonymous=true;grid.addremove=true;grid.nodescriptions=true;grid.addbtntitle='Add schedule';grid.modaltitle='Schedule';
   o=grid.option(form.Flag,'enabled','Enabled');o.rmempty=false;o.editable=true;
   choice(grid,form.ListValue,'target','Device or group',{});choice(grid,form.ListValue,'action','Action',actions);
+  o=value(grid,'brightness','Brightness (%)','and(uinteger,range(0,100))','Sets brightness and turns the light on; 0 turns it off.');o.modalonly=true;o.default='100';o.depends('action','brightness');
+  o=value(grid,'temperature','White temperature (K)','and(uinteger,range(2200,4000))','Sets white temperature and turns the light on.');o.modalonly=true;o.default='2700';o.depends('action','temperature');
+  o=value(grid,'color','Colour',null,'Sets the colour and turns the light on. Brightness can be scheduled separately.');o.modalonly=true;o.default='#ffffff';o.depends('action','color');o.validate=(_sid,v)=>/^#[0-9a-fA-F]{6}$/.test(v)?true:'Use a colour such as #ff8000.';
+  o.renderWidget=function(sid,index,value){return E('input',{id:this.cbid(sid),class:'cbi-input-text',type:'color',value:value||'#ffffff'});};o.formvalue=function(sid){return document.getElementById(this.cbid(sid))?.value||this.cfgvalue(sid);};
   o=choice(grid,form.ListValue,'event','When',events);o.textvalue=function(sid){const s=m.data.get('json',sid);return events[s.event]+(s.event!=='time'&&Number(s.offset)?' '+(s.offset>0?'+':'−')+Math.abs(s.offset)+' min':'');};
   o=choice(grid,form.MultiValue,'days','Days',weekdays);o.validate=(_sid,v)=>list(v).length?true:'Choose at least one weekday.';
   o=value(grid,'time','Time');o.placeholder='08:00';o.depends('event','time');o.validate=(_sid,v)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(v)?true:'Use HH:MM (24-hour time).';
@@ -177,14 +195,16 @@ return view.extend({
   }
   const targets=()=>m.data.sections('json','control').filter(x=>x.kind!=='scheduler');
   const targetKind=id=>{const t=targets().find(x=>x.id===id);return t?.kind==='group'?targets().find(x=>x.id===list(t.devices)[0])?.kind:t?.kind;};
-  const allowedActions=id=>targetKind(id)==='dimmer'?['toggle','dim']:targetKind(id)==='switch'?['on','off']:['up','stop','down'];
+  const ikeaCaps=id=>{const t=targets().find(x=>x.id===id);return (m.ikeaTargets||[]).find(x=>x.kind+':'+x.id===t?.ikea_target)?.capabilities||t?.ikea?.capabilities||{};};
+  const allowedActions=id=>targetKind(id)==='ikea'?['on','off',...['brightness','temperature','color'].filter(k=>ikeaCaps(id)[k])]:targetKind(id)==='dimmer'?['toggle','dim']:targetKind(id)==='switch'?['on','off']:['up','stop','down'];
   const updateActions=(section,sid,target)=>{const a=section.getOption('action'),allowed=allowedActions(target),current=a.formvalue(sid),next=allowed.includes(current)?current:allowed[0];a.keylist=[];a.vallist=[];allowed.forEach(k=>a.value(k,actions[k]));const widget=a.getUIElement(sid),select=typeof document==='undefined'?null:document.querySelector('[id="'+a.cbid?.(sid)+'"] select');if(select)select.replaceChildren(...allowed.map(k=>E('option',{value:k},actions[k])));widget?.setValue(next);};
   grid.getOption('target').onchange=function(_event,sid,v){updateActions(this.section,sid,v);};
   grid.getOption('action').validate=function(sid,v){return allowedActions(this.section.getOption('target').formvalue(sid)).includes(v)?true:'Choose an action supported by this target.';};
   for(const section of [controls,grid])section.renderMoreOptionsModal=async function(...args){await m.parse();return form.GridSection.prototype.renderMoreOptionsModal.apply(this,args);};
   grid.addModalOptions=function(section,sid){const t=section.getOption('target');t.keylist=[];t.vallist=[];targets().forEach(d=>t.value(d.id,d.name));const a=section.getOption('action');a.keylist=[];a.vallist=[];allowedActions(m.data.get('json',sid,'target')).forEach(k=>a.value(k,actions[k]));};
+  grid.getOption('action').textvalue=function(sid){const d=m.data.get('json',sid);return actions[d.action]+(d.action==='brightness'?' '+d.brightness+'%':d.action==='temperature'?' '+d.temperature+' K':d.action==='color'?' '+d.color:'');};
   grid.getOption('target').textvalue=function(sid){return targets().find(x=>x.id===m.data.get('json',sid,'target'))?.name||'Missing device';};
-  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:allowedActions(targets()[0]?.id)[0],days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
+  grid.handleAdd=function(){const id='schedule_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),sid=m.data.add('json','schedule',id);Object.entries({id,enabled:'0',target:targets()[0]?.id||'',action:allowedActions(targets()[0]?.id)[0],brightness:100,temperature:2700,color:'#ffffff',days:['1','2','3','4','5'],event:'time',time:'08:00',offset:0}).forEach(([k,v])=>m.data.set('json',sid,k,v));m.addedSection=sid;return this.renderMoreOptionsModal(sid);};
   value(scheduling,'timezone','Time zone',null,'Use “router” to follow the router’s time zone.').value('router','Follow router');
   value(scheduling,'latitude','Latitude','range(-90,90)');value(scheduling,'longitude','Longitude','range(-180,180)');
   dummy(scheduling,'_sunwait','Solar schedules',()=>data.sunwait?'Sunwait is installed':'Install sunwait to use sunrise, sunset, dawn, and dusk.');
@@ -212,6 +232,11 @@ return view.extend({
    {automatic:'Automatic',...Object.fromEntries((data.controllers||[]).filter(usb=>usb.serial).map(usb=>[usb.serial,(usb.product||'TellStick')+' ('+usb.serial+')']))},
    'Used for sending. If unplugged, the setting returns to Automatic. Reconnecting the stick does not restore the preference.');
   this.preferredOption=preferred;
+  dummy(advanced,'_ikea_status','IKEA gateway',()=>ikeaStatus);
+  const ikeaAddress=value(advanced,'_ikea_address','Gateway address',null,'Private IP address of the TRÅDFRI gateway.');ikeaAddress.rmempty=true;ikeaAddress.cfgvalue=()=>fresh.ikea?.address||'';ikeaAddress.write=ikeaAddress.remove=()=>{};
+  const ikeaCode=value(advanced,'_ikea_code','Gateway security code',null,'Stored privately on this router for automatic reconnection. Leave blank to keep the saved code.');ikeaCode.password=true;ikeaCode.rmempty=true;ikeaCode.cfgvalue=()=>'';ikeaCode.write=ikeaCode.remove=()=>{};
+  command(advanced,'_ikea_connect','IKEA connection',data.ikea?.configured?'Reconnect':'Connect',async()=>{result(await ikeaConnect(ikeaAddress.formvalue('advanced')?.trim()||'',ikeaCode.formvalue('advanced')||''));ikeaCode.getUIElement('advanced')?.setValue('');return 'Connection settings saved. Home Controller is reconnecting.';});
+
   preferred.validate=(_sid,v)=>v==='automatic'||(fresh.controllers||[]).some(usb=>usb.serial===v)?true:'Select Automatic or a connected TellStick.';
   command(advanced,'_diagnostics','Troubleshooting','Show details',()=>{ui.showModal('Home Controller diagnostics',[E('h4',{},'Network listeners'),E('pre',{},JSON.stringify(fresh.access||{},null,2)),E('h4',{},'Recent commands'),E('pre',{},JSON.stringify(fresh.status||{},(k,v)=>k==='at'&&typeof v==='number'?new Date(v*1000).toISOString():v,2)),E('div',{class:'right'},E('button',{class:'cbi-button',click:ui.hideModal},'Close'))]);return '';});
   const disclaimer=m.section(form.NamedSection,'disclaimer','disclaimer','Experimental, AI-generated software. Use at your own risk.');

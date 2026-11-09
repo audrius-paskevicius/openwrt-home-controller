@@ -39,7 +39,7 @@ func rpc() error {
 		return errors.New("administrator required")
 	}
 	if len(os.Args) > 2 && os.Args[2] == "list" {
-		fmt.Print(`{"get":{},"save":{"config":"","controller_instance":""},"stage":{"config":"","controller_instance":""},"discard":{},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{}}`)
+		fmt.Print(`{"get":{},"save":{"config":"","controller_instance":""},"stage":{"config":"","controller_instance":""},"discard":{},"password":{"user":"","password":""},"revoke":{},"sessions":{},"tls":{},"ikea":{"address":"","code":""}}`)
 		return nil
 	}
 	if len(os.Args) < 4 {
@@ -56,6 +56,25 @@ func rpc() error {
 	respond := func(v any) { json.NewEncoder(os.Stdout).Encode(v) }
 	errResult := func(e error) error { respond(map[string]string{"error": e.Error()}); return nil }
 	switch method {
+	case "ikea":
+		var args struct {
+			Address    string `json:"address"`
+			Code       string `json:"code"`
+			RPCSession string `json:"ubus_rpc_session"`
+		}
+		if e := decode(os.Stdin, &args); e != nil {
+			return errResult(e)
+		}
+		unlock, e := configLock()
+		if e != nil {
+			return errResult(e)
+		}
+		defer unlock()
+		if e = saveIKEACredentials(args.Address, args.Code); e != nil {
+			return errResult(e)
+		}
+		restart()
+		respond(map[string]bool{"ok": true})
 	case "tls":
 		if e := renewTLS(); e != nil {
 			return errResult(e)
@@ -92,7 +111,7 @@ func rpc() error {
 		if e != nil {
 			return errResult(e)
 		}
-		respond(map[string]any{"config": editable, "active_config": c, "pending": pending, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "networks": availableNetworks(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
+		respond(map[string]any{"ikea": ikeaSettings(), "config": editable, "active_config": c, "pending": pending, "status": status, "account": cred.User, "access": access, "sunwait": exists("/usr/bin/sunwait"), "controllers": available, "active_controller": active, "networks": availableNetworks(), "time_utc": time.Now().UTC().Format(time.RFC3339)})
 	case "discard":
 		if e := discardConfig(base); e != nil {
 			return errResult(e)
@@ -433,6 +452,9 @@ func configure() error {
 			return err
 		}
 		own(run + "/timezone.json")
+	}
+	if e := prepareIKEACredentials(); e != nil {
+		return e
 	}
 	for _, p := range []string{"config.json", "credential.json"} {
 		adminFile(base + "/" + p)
